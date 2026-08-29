@@ -11,7 +11,7 @@
 # numbers show is attributable to the gates, not to a handicapped prompt.
 
 agent:
-  step_limit: 12
+  step_limit: 14
   cost_limit: 0.0          # free tier; cost tracking is not the constraint here
   max_consecutive_format_errors: 3
 
@@ -32,7 +32,7 @@ agent:
 
     Useful commands:
       cat python_programs/<name>.py
-      python -m pytest python_testcases/test_<name>.py -q
+      python -m pytest python_testcases/test_<name>.py -q -p no:cacheprovider
 
     To edit a file, overwrite it with a heredoc:
       cat > python_programs/<name>.py <<'PYEOF'

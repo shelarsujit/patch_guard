@@ -6,7 +6,7 @@ calls -- so nothing about the agent's own behaviour is altered. That keeps the
 baseline credible: the comparison isolates supervision, not prompt quality.
 
     python baseline/run_baseline.py                 # replay committed cassettes
-    PATCHGUARD_CASSETTE=record python baseline/run_baseline.py
+    python baseline/run_baseline.py --record        # live sweep
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from baseline.bash_env import BashEnvironment  # noqa: E402
 from eval import harness  # noqa: E402
 from patch_guard import config  # noqa: E402
 from patch_guard.cassettes import Cassette, key_for  # noqa: E402
@@ -59,7 +60,7 @@ class _CassettedCompletion:
             raise self.cassette.miss(key, messages)
 
         import time
-        time.sleep(2.5)  # stay under the Groq free tier's 30 req/min
+        time.sleep(1.0)  # light pacing; litellm retries handle the 8k TPM ceiling
         response = self.real(*args, **kwargs)
         self.cassette.put(key, model, messages, {"response": response.model_dump()})
         return response
@@ -75,7 +76,6 @@ class BaselineRunner:
     def __call__(self, case: dict, ws: Workspace) -> dict:
         import litellm
         from minisweagent.agents.default import DefaultAgent
-        from minisweagent.environments.local import LocalEnvironment
         from minisweagent.models.litellm_model import LitellmModel
 
         traj = Trajectory(case["case_id"], self.run_label, config.TRAJECTORIES_DIR)
@@ -87,8 +87,10 @@ class BaselineRunner:
                           "max_tokens": config.MAX_OUTPUT_TOKENS},
             cost_tracking="ignore_errors",
         )
-        env = LocalEnvironment(cwd=str(ws.root),
-                               timeout=self.cfg["environment"]["timeout"])
+        # Bash-backed: upstream LocalEnvironment documents bash but uses
+        # shell=True, which is cmd.exe on Windows. See baseline/bash_env.py.
+        env = BashEnvironment(cwd=str(ws.root),
+                              timeout=self.cfg["environment"]["timeout"])
         agent = DefaultAgent(model, env, **self.cfg["agent"])
 
         real_completion = litellm.completion
@@ -142,7 +144,13 @@ def main() -> None:
     ap.add_argument("--only", nargs="*", help="case ids or program names")
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--label", default="baseline")
+    ap.add_argument("--record", action="store_true",
+                    help="call the live provider and write cassettes "
+                         "(needs GROQ_API_KEY in .env)")
     args = ap.parse_args()
+    if args.record:
+        # Set before any Cassette is constructed; they read this at init.
+        config.CASSETTE_MODE = "record"
 
     cases = harness.load_cases(args.only)
     runner = BaselineRunner(run_label=args.label)

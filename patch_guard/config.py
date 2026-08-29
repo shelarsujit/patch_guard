@@ -7,6 +7,16 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Load .env before anything reads a provider key. litellm reads GROQ_API_KEY
+# straight from the process environment, so without this a key sitting in .env
+# is invisible and every live call fails authentication.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(REPO_ROOT / ".env")
+except ImportError:  # replay needs no key, so a missing dotenv must not be fatal
+    pass
+
 QUIXBUGS_DIR = REPO_ROOT / "eval" / "data" / "quixbugs"
 CASES_DIR = REPO_ROOT / "eval" / "cases"
 CASSETTES_DIR = REPO_ROOT / "cassettes"
@@ -52,7 +62,11 @@ PER_FILE_TIMEOUT = 20
 DEFAULT_MODEL = "groq/openai/gpt-oss-20b"
 MODEL = os.environ.get("PATCHGUARD_MODEL", DEFAULT_MODEL)
 TEMPERATURE = 0.0
-MAX_OUTPUT_TOKENS = 2048
+# gpt-oss-20b is a reasoning model: its internal reasoning is billed as
+# completion tokens, so a budget sized for the visible answer alone gets
+# consumed before any text is emitted (a 16-token cap returns an empty
+# string, not an error). Sized to leave room for reasoning plus a full file.
+MAX_OUTPUT_TOKENS = 4096
 
 # Documented fallback if the tokens/day ceiling bites mid-recording.
 FALLBACK_MODEL = "openrouter/deepseek/deepseek-r1:free"
@@ -64,7 +78,10 @@ CASSETTE_MODE = os.environ.get("PATCHGUARD_CASSETTE", "replay")
 # Retries the supervisor grants the worker before rejecting the patch outright.
 MAX_RETRIES = 3
 
-# Steps the baseline agent may take. Matched to the supervisor's retry budget so
-# neither runner wins on sheer attempt count -- the comparison is about gates,
-# not about who got more turns.
-BASELINE_STEP_LIMIT = 12
+# Shell steps the baseline agent may take. Measured, not guessed: a smoke run
+# showed ~7 steps go to legitimate exploration (read the program, the test,
+# the test data, reproduce the failure) before it is ready to edit. 14 leaves
+# room to edit, re-test and submit. Deliberately far more than the
+# supervisor's 4 LLM calls -- where the budgets differ, the advantage belongs
+# to the baseline, so the comparison cannot be accused of starving it.
+BASELINE_STEP_LIMIT = 14

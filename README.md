@@ -114,25 +114,42 @@ claude mcp add patch-guard -- .venv/Scripts/python.exe patch_guard/mcp_server.py
 Every command below runs **offline, with no API key, at $0**, replaying the
 committed cassettes.
 
-```bash
-make setup     # venv, pinned deps, build cases
-make sanity    # gold patch scores 100%; a no-op agent scores 0%
-make test      # 29 adversarial tests over the gates, cassettes and graph
-make baseline  # mini-swe-agent          -> results/baseline.jsonl
-make agent     # Patch-Guard supervisor  -> results/agent.jsonl
-make eval      # -> results/report.md
+`run.py` is the cross-platform entry point and needs no `make` — Windows has no
+`make`, and PowerShell 5.1 has no `&&`, so pass tasks as arguments instead of
+chaining them:
+
 ```
+python run.py sanity      # gold patch scores 100%; a no-op agent scores 0%
+python run.py test        # 29 adversarial tests over the gates, cassettes and graph
+python run.py baseline    # mini-swe-agent          -> results/baseline.jsonl
+python run.py agent       # Patch-Guard supervisor  -> results/agent.jsonl
+python run.py eval        # -> results/report.md
+
+python run.py baseline agent eval    # several tasks in one go
+```
+
+A `Makefile` with the same targets is provided for the devcontainer, where
+`make` is available.
 
 Runtime is a few minutes, dominated by real pytest subprocesses. Only LLM
 *decisions* are replayed — the tools and the test suite genuinely execute, so a
 replayed trajectory is an honest one.
 
-To re-record against the live provider you need `GROQ_API_KEY` in `.env`:
+To re-record against the live provider, put `GROQ_API_KEY` in `.env` (copy
+`.env.example`) and run:
 
-```bash
-make record-baseline
-make record-agent
 ```
+python run.py record
+```
+
+Re-running is safe and **resumable**: calls that are already recorded replay
+from their cassettes, so only genuinely new calls reach the provider. A sweep
+interrupted by the free tier's limits can simply be run again.
+
+Groq's binding free-tier limit is **8,000 tokens per minute** (not the daily
+token cap), and mini-swe-agent's context grows with every step, so a full
+recording sweep is slow — budget a couple of hours. Judges never pay this cost;
+they replay.
 
 ### Why the numbers are trustworthy
 

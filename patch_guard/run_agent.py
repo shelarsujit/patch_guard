@@ -73,7 +73,13 @@ def main() -> None:
     ap.add_argument("--only", nargs="*", help="case ids or program names")
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--label", default="agent", help="trajectory subdirectory")
+    ap.add_argument("--record", action="store_true",
+                    help="call the live provider and write cassettes "
+                         "(needs GROQ_API_KEY in .env)")
     args = ap.parse_args()
+    if args.record:
+        # Set before any Cassette is constructed; they read this at init.
+        config.CASSETTE_MODE = "record"
 
     cases = harness.load_cases(args.only)
     runner = PatchGuardRunner(auto_approve=args.yes, run_label=args.label)

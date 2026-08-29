@@ -53,9 +53,10 @@ class WorkerModel:
     def _call_provider(self, messages: list[dict]) -> dict:
         import litellm
 
-        # Groq's free tier allows 30 req/min. Pace below that so a recording
-        # sweep does not die halfway and leave a half-written cassette set.
-        time.sleep(2.5)
+        # Groq's binding free-tier limit is 8k tokens/minute, not requests.
+        # litellm retries on 429; this is light pacing to reduce how often
+        # that path is taken.
+        time.sleep(1.0)
 
         completion = litellm.completion(
             model=self.model,
