@@ -24,7 +24,9 @@
 # the numbers show is attributable to the gates, not to a handicapped prompt.
 
 agent:
-  step_limit: 10
+  # step_limit is injected from patch_guard.config.BASELINE_STEP_LIMIT at load
+  # time so the budget has a single source of truth. It is documented there,
+  # and the fairness claim in the README depends on it actually being applied.
   cost_limit: 0.0          # free tier; cost tracking is not the constraint here
   max_consecutive_format_errors: 3
 

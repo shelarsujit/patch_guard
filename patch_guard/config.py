@@ -56,17 +56,28 @@ SUITE_TIMEOUT = 90
 PER_FILE_TIMEOUT = 20
 
 # --- Worker model -----------------------------------------------------------
-# Groq free tier: 30 req/min, 1000 req/day, 200k tokens/day. Deliberately a
-# weak open model: the whole thesis is that a cheap worker exhibits the three
-# failure modes, and that deterministic gates catch them anyway.
+# Groq free tier, read from the x-ratelimit-* response headers rather than
+# assumed: 8000 tokens/minute and 1000 requests, with no tokens-per-day header
+# in evidence. The binding constraint is therefore throughput, not a daily
+# ceiling -- see patch_guard/ratelimit.py. Deliberately a weak open model: the
+# whole thesis is that a cheap worker exhibits the three failure modes, and
+# that deterministic gates catch them anyway.
 DEFAULT_MODEL = "groq/openai/gpt-oss-20b"
 MODEL = os.environ.get("PATCHGUARD_MODEL", DEFAULT_MODEL)
 TEMPERATURE = 0.0
 # gpt-oss-20b is a reasoning model: its internal reasoning is billed as
 # completion tokens, so a budget sized for the visible answer alone gets
 # consumed before any text is emitted (a 16-token cap returns an empty
-# string, not an error). Sized to leave room for reasoning plus a full file.
-MAX_OUTPUT_TOKENS = 4096
+# string, not an error).
+#
+# The upper bound matters for throughput, not just truncation: Groq reserves
+# max_tokens against the 8k tokens/minute ceiling at request time, whatever the
+# reply actually costs. At 4096 a call reserved ~4.6k and the sweep managed
+# under 1.5 accepted calls a minute. Measured usage is far below that -- a bash
+# tool-call step spends ~140 completion tokens, and the largest program in the
+# set is ~430 tokens, so even a full-file rewrite leaves ~1.1k here for
+# reasoning. Sized from those measurements rather than from caution.
+MAX_OUTPUT_TOKENS = 1536
 
 # Documented fallback if the tokens/day ceiling bites mid-recording.
 FALLBACK_MODEL = "openrouter/deepseek/deepseek-r1:free"

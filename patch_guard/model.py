@@ -7,10 +7,9 @@ discipline. The only thing that differs between them is the supervision.
 
 from __future__ import annotations
 
-import time
-
 from patch_guard import config
 from patch_guard.cassettes import Cassette
+from patch_guard.ratelimit import BUCKET, estimate_prompt_tokens
 
 
 class WorkerModel:
@@ -53,10 +52,12 @@ class WorkerModel:
     def _call_provider(self, messages: list[dict]) -> dict:
         import litellm
 
-        # Groq's binding free-tier limit is 8k tokens/minute, not requests.
-        # litellm retries on 429; this is light pacing to reduce how often
-        # that path is taken.
-        time.sleep(1.0)
+        # Groq's binding free-tier limit is 8k tokens/minute, and it reserves
+        # max_tokens against that ceiling up front. Pace on the same figure the
+        # server bills so requests are accepted first time instead of bouncing
+        # off a 429 and sleeping for a server-chosen interval.
+        reserved = estimate_prompt_tokens(messages) + config.MAX_OUTPUT_TOKENS
+        BUCKET.reserve(reserved)
 
         completion = litellm.completion(
             model=self.model,
@@ -66,6 +67,9 @@ class WorkerModel:
         )
         choice = completion.choices[0]
         usage = getattr(completion, "usage", None)
+        if usage is not None:
+            BUCKET.settle(reserved, (getattr(usage, "prompt_tokens", 0) or 0)
+                          + config.MAX_OUTPUT_TOKENS)
         return {
             "text": choice.message.content or "",
             "finish_reason": getattr(choice, "finish_reason", None),

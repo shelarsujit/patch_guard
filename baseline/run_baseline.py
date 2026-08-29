@@ -24,6 +24,7 @@ from baseline.resilient_model import ResilientLitellmModel  # noqa: E402
 from eval import harness  # noqa: E402
 from patch_guard import config  # noqa: E402
 from patch_guard.cassettes import Cassette, key_for  # noqa: E402
+from patch_guard.ratelimit import BUCKET, estimate_prompt_tokens  # noqa: E402
 from patch_guard.trace import Trajectory  # noqa: E402
 from patch_guard.workspace import Workspace  # noqa: E402
 
@@ -60,9 +61,16 @@ class _CassettedCompletion:
         if self.cassette.mode != "record":
             raise self.cassette.miss(key, messages)
 
-        import time
-        time.sleep(1.0)  # light pacing; litellm retries handle the 8k TPM ceiling
+        # Groq reserves max_tokens against the TPM ceiling up front, so pace on
+        # prompt + max_tokens rather than on what the reply turns out to cost.
+        # See patch_guard/ratelimit.py for why this is proactive, not reactive.
+        reserved = estimate_prompt_tokens(messages) + int(kwargs.get("max_tokens") or 0)
+        BUCKET.reserve(reserved)
         response = self.real(*args, **kwargs)
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            actual = (getattr(usage, "prompt_tokens", 0) or 0) + int(kwargs.get("max_tokens") or 0)
+            BUCKET.settle(reserved, actual)
         self.cassette.put(key, model, messages, {"response": response.model_dump()})
         return response
 
@@ -89,6 +97,10 @@ class BaselineRunner:
     def __init__(self, run_label: str = "baseline") -> None:
         self.run_label = run_label
         self.cfg = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+        # Single source of truth for the budget. The README's fairness claim is
+        # that the baseline gets strictly more steps than the supervisor gets
+        # LLM calls, so the number that is documented must be the number applied.
+        self.cfg["agent"]["step_limit"] = config.BASELINE_STEP_LIMIT
 
     def __call__(self, case: dict, ws: Workspace) -> dict:
         import litellm
