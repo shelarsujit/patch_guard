@@ -181,7 +181,7 @@ chaining them:
 
 ```
 python run.py sanity      # gold patch scores 100%; a no-op agent scores 0%
-python run.py test        # 29 adversarial tests over the gates, cassettes and graph
+python run.py test        # 49 adversarial tests: gates, cassettes, graph, harness
 python run.py baseline    # mini-swe-agent          -> results/baseline.jsonl
 python run.py agent       # Patch-Guard supervisor  -> results/agent.jsonl
 python run.py eval        # -> results/report.md
@@ -196,7 +196,7 @@ Runtime is a few minutes, dominated by real pytest subprocesses. Only LLM
 *decisions* are replayed — the tools and the test suite genuinely execute, so a
 replayed trajectory is an honest one.
 
-To re-record against the live provider, put `GROQ_API_KEY` in `.env` (copy
+To re-record against the live provider, put `OPENROUTER_API_KEY` in `.env` (copy
 `.env.example`) and run:
 
 ```
@@ -205,12 +205,26 @@ python run.py record
 
 Re-running is safe and **resumable**: calls that are already recorded replay
 from their cassettes, so only genuinely new calls reach the provider. A sweep
-interrupted by the free tier's limits can simply be run again.
+interrupted part-way can simply be run again.
 
-Groq's binding free-tier limit is **8,000 tokens per minute** (not the daily
-token cap), and mini-swe-agent's context grows with every step, so a full
-recording sweep is slow — budget a couple of hours. Judges never pay this cost;
+A full sweep costs roughly **$0.03** and a few minutes. Judges never pay this;
 they replay.
+
+**Replay is exact; re-recording is not.** The worker runs at temperature 0, but
+the baseline's retry path deliberately escalates temperature when the model
+returns a reply containing no tool call — because at temperature 0 the retry is
+byte-identical and therefore fails identically, which was scoring a provider
+quirk as the agent refusing to act (see CHANGELOG entry 5). Cassettes record
+what actually happened, so `python run.py baseline agent eval` reproduces the
+committed numbers exactly. A fresh `record` will not reproduce them case for
+case, and the per-case table should be read as one sample rather than a fixed
+point.
+
+On provider choice: recording runs against `openrouter/openai/gpt-oss-20b`.
+Groq serves the same weights for free and is kept as a fallback, but enforces
+**200,000 tokens/day** on top of its advertised 8,000 tokens/minute — a ceiling
+that appears in no `x-ratelimit-*` header and is discoverable only by crossing
+it. A full sweep needs several times that.
 
 ### Why the numbers are trustworthy
 
