@@ -67,6 +67,15 @@ class _CassettedCompletion:
         key = key_for(model, keyed, config.TEMPERATURE)
 
         cached = self.cassette.get(key)
+        if cached is None:
+            # The baseline's prompts embed live pytest output, including how long
+            # the run took, so an exact hash can miss a recording that is present.
+            cached = self.cassette.get_normalized(model, keyed, config.TEMPERATURE)
+        if cached is None:
+            # Tool output is re-executed on replay and can differ in ways
+            # normalisation does not cover, so fall back to position in the
+            # conversation. Counted separately in the cassette stats.
+            cached = self.cassette.get_positional(keyed)
         if cached is not None:
             return litellm.ModelResponse(**cached["response"])
 

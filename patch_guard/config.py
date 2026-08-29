@@ -51,9 +51,13 @@ EDITABLE_PATHS = ["python_programs"]
 # QuixBugs' own bugs include infinite loops (bitcount is `n ^= n - 1` instead of
 # `n &= n - 1`), so every pytest invocation is wall-clocked. A hang is recorded
 # as a failure; it is never allowed to look like a test that stopped existing.
+# Raised from 20s after a loaded machine pushed legitimately-passing files past
+# the per-file limit, turning "the harness ran out of time" into "the agent broke
+# these tests". The cost of a generous limit is wall-clock; the cost of a tight
+# one is wrong measurements.
 TARGET_TEST_TIMEOUT = 20
-SUITE_TIMEOUT = 90
-PER_FILE_TIMEOUT = 20
+SUITE_TIMEOUT = 120
+PER_FILE_TIMEOUT = 45
 
 # --- Worker model -----------------------------------------------------------
 # Deliberately a weak open model: the whole thesis is that a cheap worker

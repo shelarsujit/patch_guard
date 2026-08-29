@@ -25,6 +25,10 @@ class CaseResult:
 
     # What the agent claimed.
     done_claim: bool = False
+    # Supervisor only: what the worker asserted before the gates ruled on it.
+    # done_claim above is the system's claim; this is the raw model's. The
+    # difference between them is what the guard caught.
+    worker_done_claim: bool = False
     refused: bool = False
 
     # What the gates actually measured.

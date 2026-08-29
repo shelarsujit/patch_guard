@@ -237,3 +237,39 @@ def test_gold_implementations_are_not_visible_to_the_agent(case, ws):
     workspace.apply_gold_patch(ws, case["program"])
     assert _score(case, ws, {"done_claim": True}).net_resolved, \
         "the harness must still be able to apply gold from the vendored source"
+
+
+def test_an_unchanged_workspace_can_never_regress(tmp_path):
+    """No patch, no regression -- and it must not depend on the suite running.
+
+    This is the state the supervisor leaves behind whenever a gate rejects: it
+    rolls back, so the tree is byte-identical to the pristine snapshot. Scoring
+    that tree by executing the suite made the answer depend on wall-clock, and
+    on a case whose bug is an infinite loop the run timed out and every
+    unreported node was counted as regressed -- 59 of them, against an empty
+    diff. The supervisor then appeared to cause 5.90 regressions per patch while
+    the unguarded baseline caused none, which is precisely backwards.
+    """
+    case = harness.load_cases(["quixbugs__bitcount"])[0]
+    ws = workspace.build(case, tmp_path / case["case_id"])
+
+    assert ws.changed_files() == {}, "a freshly built workspace is pristine"
+
+    result = _score(case, ws, {"done_claim": False})
+    assert result.patch == "", "no patch was applied"
+    assert result.regressions == [], "an empty diff cannot have broken anything"
+
+
+def test_rollback_after_rejection_leaves_nothing_to_blame(tmp_path):
+    """The same invariant, reached the way the supervisor reaches it."""
+    case = harness.load_cases(["quixbugs__quicksort"])[0]
+    ws = workspace.build(case, tmp_path / case["case_id"])
+
+    ws.write("python_programs/quicksort.py", "def quicksort(arr):\n    return []\n")
+    assert ws.changed_files(), "the bad patch is in place"
+
+    ws.rollback()
+
+    result = _score(case, ws, {"done_claim": False})
+    assert result.regressions == []
+    assert not result.net_resolved, "rolling back is not the same as resolving"

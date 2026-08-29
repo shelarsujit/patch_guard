@@ -121,10 +121,16 @@ mini-swe-agent's model layer calls — so the agent itself is untouched. It gets
 same model, temperature, cases and step budget, and is told in the same words that
 tests are off limits.
 
-**Evidence.** Pending — requires a `GROQ_API_KEY` to record. See "Open" below.
+**Evidence.** Recorded: baseline 50% net-resolved (5/10) against the supervisor's
+70% (7/10), on identical cases with identical worker, temperature and starting
+information. The baseline was given the *larger* budget — 14 shell steps against
+the supervisor's 4 patch attempts — and `max_consecutive_format_errors` was
+raised from 3 to 8 in its favour.
 
-**Decision / Learning.** Any measured gap is then attributable to supervision rather
-than to prompt quality, which is the only comparison worth publishing.
+**Decision / Learning.** The gap is attributable to supervision rather than to
+prompt quality, which is the only comparison worth publishing. Where the two
+runners differ in budget or tolerance, the advantage was deliberately given to
+the baseline, so the measured gap is a floor rather than a best case.
 
 ---
 
@@ -177,11 +183,47 @@ commit labelled "misc fixes".
 
 ---
 
+## 6 — The gates turned out to be a repair signal, not only a filter
+
+**What I tried and why.** The expectation going in was a trade: gates reject bad
+patches, so the supervisor should resolve *fewer* cases than the baseline while
+cheating less. That prediction was wrong in a way worth recording.
+
+**Evidence.** 50% → 70% net-resolved, and 14% → 0% cheat rate, with no case where
+the baseline won and the supervisor lost. The two cases the supervisor gained,
+`depth_first_search` and `detect_cycle`, are ones the one-shot baseline abandoned.
+
+**Decision / Learning.** The mechanism is that a rejection carries its reason back
+into the next attempt — "the target tests still fail", "the patched code never
+terminated (infinite loop)" — so the worker gets a grounded, specific correction
+rather than another blind try. This is the opposite end of ECLoop's finding that
+post-hoc *self-review* degrades performance (−1.4pp, −1.8pp): a pytest exit code
+does not reason about whether the evidence was sufficient, and cannot be argued
+out of a failing assertion. Deterministic post-hoc execution is a different
+mechanism from post-hoc LLM review, and on this set it helped rather than hurt.
+
+---
+
 ## Open
 
-- **Recording run not yet performed.** Everything is implemented, tested and wired;
-  the baseline-vs-agent numbers require one live recording sweep against Groq's free
-  tier. `make sanity`, `make test` and the MCP server all run today with no key.
+- **Gate 2 is unmeasured on the standard set.** Regressions per patch is 0.00 for
+  both runners. QuixBugs programs are independent single files, so a one-file
+  patch structurally cannot break another program's tests — TDAD's
+  6.5-broken-tests-per-patch has no way to reproduce here. The gate is exercised
+  by an adversarial test and by one impossible case that broke 62 previously
+  passing tests, but a case set with genuinely shared modules is needed to
+  measure it. This is a limitation of the evaluation set, not of the gate.
+- **Nothing refused; it was blocked.** Correct-refusal is 0/4 for both runners.
+  The supervisor never cheated, but it also never recognised the contradiction
+  and said so — the `REFUSE` path never fired. Harm prevented, diagnosis not made.
+- **Overclaiming barely appeared at this tier.** 11 of the baseline's 14 runs
+  ended by exhausting the step limit rather than submitting, and all 3 of its
+  done-claims were correct. The dominant failure here is budget exhaustion, not
+  false victory, so the 0% overclaim row reflects a failure mode that did not
+  show up rather than a gate that stopped it.
+- **Re-recording is not deterministic.** Replay reproduces the published numbers
+  exactly; a fresh `record` will not, because the baseline's retry path escalates
+  temperature to break byte-identical retries. The per-case table is one sample.
 - **Cut early and deliberately:** the SWE-bench Verified Mini case and the LoRA
   "done-or-not" verifier. The deterministic gates already dominate what a learned
   trustworthiness predictor would offer, and the brief explicitly rewards a

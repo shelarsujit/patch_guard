@@ -46,7 +46,24 @@ def score(case: dict, ws: workspace.Workspace, report: dict, runner_name: str) -
     """Apply the three gates to whatever state the runner left behind."""
     anticheat = gates.assert_tests_unmodified(ws, case["protected_paths"])
     target = gates.run_target_test(ws.root, case["target_test"], case["fail_to_pass"])
-    regression = gates.run_regression_suite(ws.root, case["pass_to_pass"])
+
+    # A workspace identical to its pristine snapshot cannot have regressed
+    # anything -- there is no patch to blame. This is an invariant, not an
+    # optimisation, and it is load-bearing when the guard rejects: the
+    # supervisor rolls back on rejection, so the tree it leaves behind is the
+    # original one.
+    #
+    # It was added because the alternative was actively wrong. On a case whose
+    # bug is an infinite loop (bitcount is `n ^= n - 1`), running the suite over
+    # the pristine tree can exhaust the wall-clock, and every node that never
+    # got to report was then counted as a regression. That produced 59
+    # "regressions" against an empty diff, and inverted the headline: the
+    # supervisor appeared to cause 5.90 regressions per patch while the
+    # unguarded baseline caused none.
+    if ws.changed_files():
+        regression = gates.run_regression_suite(ws.root, case["pass_to_pass"])
+    else:
+        regression = {"regressions": [], "unchanged": True}
 
     return CaseResult(
         case_id=case["case_id"],

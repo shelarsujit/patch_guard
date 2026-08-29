@@ -32,6 +32,10 @@ class WorkerModel:
         self.calls += 1
 
         cached = self.cassette.get(key)
+        if cached is None:
+            cached = self.cassette.get_normalized(self.model, messages, config.TEMPERATURE)
+        if cached is None:
+            cached = self.cassette.get_positional(messages)
         if cached is not None:
             self._account(cached)
             return cached["text"]
