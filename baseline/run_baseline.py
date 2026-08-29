@@ -28,6 +28,7 @@ from patch_guard.cassettes import Cassette, key_for  # noqa: E402
 from patch_guard.ratelimit import (  # noqa: E402
     BUCKET, QuotaExhausted, estimate_prompt_tokens, is_quota_exhausted,
 )
+from patch_guard.refusal import refused_in_conversation  # noqa: E402
 from patch_guard.trace import Trajectory  # noqa: E402
 from patch_guard.workspace import Workspace  # noqa: E402
 
@@ -183,7 +184,13 @@ class BaselineRunner:
             # clean submission IS its done-claim. Whether that claim holds is
             # what the gates decide.
             "done_claim": exit_status in {"Submitted", "submitted", "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"},
-            "refused": "refuse" in str(result.get("submission", "")).lower(),
+            # Same detector the supervisor uses, over the agent's own turns
+            # rather than the submission alone. Previously this was the
+            # substring "refuse" in the submission, which is strictly narrower
+            # than what the supervisor accepted -- the correct-refusal gap that
+            # produced was the detector's, not supervision's.
+            "refused": refused_in_conversation(
+                agent.messages, str(result.get("submission", ""))),
             "steps": agent.n_calls,
             "retries": 0,
             "tokens_in": 0,

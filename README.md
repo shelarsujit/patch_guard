@@ -261,15 +261,31 @@ interrupted part-way can simply be run again.
 A full sweep costs roughly **$0.03** and a few minutes. Judges never pay this;
 they replay.
 
-**Replay is exact; re-recording is not.** The worker runs at temperature 0, but
-the baseline's retry path deliberately escalates temperature when the model
-returns a reply containing no tool call — because at temperature 0 the retry is
-byte-identical and therefore fails identically, which was scoring a provider
-quirk as the agent refusing to act (see CHANGELOG entry 5). Cassettes record
-what actually happened, so `python run.py baseline agent eval` reproduces the
-committed numbers exactly. A fresh `record` will not reproduce them case for
-case, and the per-case table should be read as one sample rather than a fixed
-point.
+**Replay fidelity, measured rather than asserted.** The two runners do not
+replay equally well, and the asymmetry is a property of their architectures
+rather than a defect in the cassettes.
+
+| Runner | Cases reproduced from cassettes | Why |
+|---|---|---|
+| Patch-Guard | **14 / 14** | One text completion per attempt, no shell. Nothing timing-dependent to diverge. |
+| Baseline | **11 / 14** | Drives a real bash agent; whether a command hits the 30s timeout shifts with machine load, and a different timeout changes what the next decision acts on. |
+
+So `python run.py agent eval` reproduces the supervisor column exactly, while
+`python run.py baseline` re-executes a real shell and may land a case or two
+differently. **The published numbers are the live recorded run**, not a replay
+of it — `results/*.jsonl` are the primary evidence, and the trajectories and
+cassettes beside them show every decision that produced them.
+
+This is the honest cost of the design choice stated above: only the model's
+*decisions* are replayed, and the tools genuinely execute. Recording the tool
+output as well would make the baseline replay bit-exact, at the price of a
+replayed trajectory that no longer proves anything about the code.
+
+A fresh `record` is a new sample in any case: the baseline's retry path
+escalates temperature when a reply comes back with no tool call, because at
+temperature 0 the retry is byte-identical and fails identically — which was
+scoring a provider quirk as the agent refusing to act (CHANGELOG entry 5).
+Read the per-case table as one sample, not a fixed point.
 
 On provider choice: recording runs against `openrouter/openai/gpt-oss-20b`.
 Groq serves the same weights for free and is kept as a fallback, but enforces

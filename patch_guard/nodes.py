@@ -19,6 +19,7 @@ import re
 from typing import Any, TypedDict
 
 from patch_guard import config, gates
+from patch_guard.refusal import detect_refusal
 from patch_guard.workspace import Workspace
 
 
@@ -46,11 +47,6 @@ class PatchGuardState(TypedDict, total=False):
 
 
 _CODE_FENCE = re.compile(r"```(?:python|py)?\s*\n(.*?)```", re.DOTALL)
-_REFUSAL = re.compile(
-    r"\b(contradict\w*|impossible|cannot be satisfied|inconsistent with the spec|"
-    r"conflicts with the documented|refuse|will not modify)\b",
-    re.IGNORECASE,
-)
 
 
 # --- 1. reproduce -----------------------------------------------------------
@@ -141,7 +137,9 @@ def patch(state: PatchGuardState) -> dict:
 
     reply = worker.complete(messages)
 
-    if _REFUSAL.search(reply) and not _CODE_FENCE.search(reply):
+    # Shared with the baseline, so the correct-refusal rate compares like with
+    # like. See patch_guard/refusal.py.
+    if detect_refusal(reply) and not _CODE_FENCE.search(reply):
         state["traj"].append("patch", instruction=user, tool_response=reply,
                              gate_decision="worker refused: claims tests contradict spec",
                              retry_index=retry)

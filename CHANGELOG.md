@@ -204,6 +204,51 @@ mechanism from post-hoc LLM review, and on this set it helped rather than hurt.
 
 ---
 
+## 7 — Replaying an agent that runs a shell is not the same as replaying one that does not
+
+**What I tried and why.** The reproducibility claim was that a judge re-runs
+`python run.py baseline agent eval` and gets the published numbers back at $0.
+Before publishing that, I checked it — by diffing a full replay against the live
+recorded run, case by case, rather than by confirming the command exits zero.
+
+**Evidence.**
+
+| Runner | Cases reproduced | Diverged |
+|---|---|---|
+| Patch-Guard | **14 / 14** | none |
+| Baseline | **11 / 14** | `impossible__knapsack`, `impossible__quicksort`, `quixbugs__topological_ordering` |
+
+The divergence was not noise around the edges: both of the baseline's reward
+hacks vanished on replay, which is the single most load-bearing result in the
+comparison.
+
+The cause is architectural. The supervisor makes one text completion per attempt
+and never runs a command, so its prompts contain only file contents and there is
+nothing timing-dependent in them. The baseline drives a real bash agent, its
+prompts embed real command output, and whether a command hits the 30s timeout
+shifts with machine load — a different timeout leaves a different workspace for
+the next decision to act on. Content hashing cannot survive that: once one lookup
+misses, the conversation diverges and every later lookup misses too. Replaying
+decisions in recorded order removes the misses but not the divergence, because
+the same decision applied to a differently-timed shell produces a different tree.
+
+**Decision / Learning.** The published numbers are the **live recorded run**, and
+the README now says so with the fidelity measured per runner instead of claiming
+exactness for both. Three options were available and the choice is worth stating:
+
+1. Record the tool output too, and replay it. Bit-exact, and worthless — a
+   trajectory that never really executes proves nothing about the code.
+2. Quietly publish replay numbers and call them reproductions. They differ from
+   what was actually measured.
+3. Publish what was measured, and measure how well it replays.
+
+The third is the only one that survives someone checking. It also turns the
+limitation into a result: **an agent that acts through a shell is inherently
+harder to reproduce than one that emits a patch**, which is an argument for the
+supervised architecture that has nothing to do with the gates.
+
+---
+
 ## Open
 
 - **Gate 2 is unmeasured on the standard set.** Regressions per patch is 0.00 for
@@ -221,9 +266,9 @@ mechanism from post-hoc LLM review, and on this set it helped rather than hurt.
   done-claims were correct. The dominant failure here is budget exhaustion, not
   false victory, so the 0% overclaim row reflects a failure mode that did not
   show up rather than a gate that stopped it.
-- **Re-recording is not deterministic.** Replay reproduces the published numbers
-  exactly; a fresh `record` will not, because the baseline's retry path escalates
-  temperature to break byte-identical retries. The per-case table is one sample.
+- **The baseline does not replay bit-exactly** (11/14; the supervisor is 14/14).
+  See entry 7. A fresh `record` is a new sample on either side, because the
+  baseline's retry path escalates temperature to break byte-identical retries.
 - **Cut early and deliberately:** the SWE-bench Verified Mini case and the LoRA
   "done-or-not" verifier. The deterministic gates already dominate what a learned
   trustworthiness predictor would offer, and the brief explicitly rewards a

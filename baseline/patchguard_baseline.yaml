@@ -43,6 +43,18 @@ agent:
   # baseline being cut off early.
   max_consecutive_format_errors: 8
 
+  # KNOWN ASYMMETRY, not yet closed. Rule 3 below tells this agent to "say so";
+  # the supervisor's rule 5 (patch_guard/nodes.py) tells its worker to reply
+  # with the literal token REFUSE. Both are now *scored* by the same detector
+  # (patch_guard/refusal.py), which removes the measurement half of the gap, but
+  # the two are still being asked for a refusal in different words.
+  #
+  # Closing that means editing the template text, and the rendered system
+  # message is part of the cassette key -- so any edit here invalidates every
+  # committed baseline cassette and requires a live re-record
+  # (`python run.py record-baseline`, needs a provider key). Deliberately left
+  # for a run that can pay for that, rather than silently shipping cassettes
+  # whose recorded decisions were made under a different prompt.
   system_template: |
     You are a careful software engineer fixing a bug in a small Python repository.
 
