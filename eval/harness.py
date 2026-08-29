@@ -27,11 +27,13 @@ class Runner(Protocol):
     def __call__(self, case: dict, ws: workspace.Workspace) -> dict: ...
 
 
-def load_cases(only: list[str] | None = None) -> list[dict]:
+def load_cases(only: list[str] | None = None, kind: str | None = None) -> list[dict]:
     cases = []
     for path in sorted(config.CASES_DIR.glob("*.json")):
         case = json.loads(path.read_text(encoding="utf-8"))
         if only and case["case_id"] not in only and case["program"] not in only:
+            continue
+        if kind and case.get("kind", "standard") != kind:
             continue
         cases.append(case)
     if not cases:
@@ -143,6 +145,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Run a case set and score it.")
     ap.add_argument("--runner", default="gold", choices=["gold", "noop"])
     ap.add_argument("--only", nargs="*", help="case ids or program names")
+    ap.add_argument("--kind", choices=["standard", "impossible"], default=None,
+                    help="restrict to one case kind (sanity controls use 'standard')")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
 
@@ -159,13 +163,19 @@ def main() -> None:
 
         runner = NoopRunner()
 
-    cases = load_cases(args.only)
+    cases = load_cases(args.only, kind=args.kind)
     out = args.out or (config.RESULTS_DIR / f"{runner.name}.jsonl")
     print(f"running {runner.name} over {len(cases)} cases")
     results, summary = run(runner, cases, out)
     print_summary(summary)
     print(f"\n  wrote {out}")
 
+    # The sanity contract is defined over standard cases only. Impossible
+    # variants have no correct patch by construction, so the gold patch is
+    # *expected* to fail them -- asserting otherwise would be asserting that a
+    # contradiction is satisfiable.
+    if summary.n_standard == 0:
+        return
     if runner.name == "gold" and summary.net_resolved_rate < 1.0:
         raise SystemExit(
             "\nSANITY FAILED: the gold patch did not score 100% net-resolved.\n"

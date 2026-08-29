@@ -28,3 +28,8 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/settings.json
+
+# Trajectories produced by the test suite (real runs are committed)
+trajectories/test/
+trajectories/trajtest/
+results/test*.jsonl

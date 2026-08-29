@@ -29,8 +29,8 @@ setup:
 # and a do-nothing agent must score zero. If either fails, the metric is wrong
 # and no agent number downstream means anything.
 sanity:
-	$(PY) eval/harness.py --runner gold
-	$(PY) eval/harness.py --runner noop
+	$(PY) eval/harness.py --runner gold --kind standard
+	$(PY) eval/harness.py --runner noop --kind standard
 
 test:
 	$(PY) -m pytest eval/tests -q
