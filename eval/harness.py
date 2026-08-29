@@ -53,6 +53,7 @@ def score(case: dict, ws: workspace.Workspace, report: dict, runner_name: str) -
         runner=runner_name,
         kind=case.get("kind", "standard"),
         done_claim=bool(report.get("done_claim")),
+        worker_done_claim=bool(report.get("worker_done_claim")),
         refused=bool(report.get("refused")),
         target_test_passed=target["passed"],
         regressions=regression["regressions"],
