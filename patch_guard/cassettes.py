@@ -108,7 +108,8 @@ class Cassette:
         self.normalized_hits = 0
         self.positional_hits = 0
         self._normalized: dict[str, dict] | None = None
-        self._by_length: dict[int, dict] | None = None
+        self._sequence: list[dict] | None = None
+        self._cursor = 0
 
     def _path(self, key: str) -> Path:
         return self.dir / f"{key[:16]}.json"
@@ -153,39 +154,44 @@ class Cassette:
             self.normalized_hits += 1
         return response
 
-    def get_positional(self, messages: list[dict]) -> dict | None:
-        """Last-resort replay: match the recording at the same point in the chain.
+    def get_sequential(self) -> dict | None:
+        """Last-resort replay: the next recorded decision, in recorded order.
 
-        An agent conversation is linear and grows by one turn per call, so the
-        message count identifies a call's position unambiguously -- the recorded
-        chains for a case have strictly increasing, distinct lengths.
+        Content hashing cannot survive the baseline. Its prompts embed live tool
+        output, and on replay the tools genuinely re-execute -- by design, since
+        that is what keeps a replayed trajectory honest. Anything that differs in
+        what a command printed changes the prompt, so the hash misses a recording
+        that is present and correct, and once one lookup misses the conversation
+        diverges and every later hash misses too.
 
-        This exists because exact and normalised hashing both key on the *text*
-        of embedded tool output, and the baseline re-executes its tools for real
-        on replay. Any difference in what pytest printed -- a duration, a
-        traceback rendered against a differently-ordered filesystem -- changes
-        the prompt and misses a recording that is present and correct.
+        Recorded order is recoverable without any extra bookkeeping: an agent
+        conversation grows monotonically, so sorting the recordings by message
+        count reconstructs the sequence the run actually made.
 
-        The tradeoff is explicit: this trusts position rather than content, so it
-        can only be right when the conversation followed the same shape. It is
-        tried only after both content-based lookups fail, and it is counted
-        separately so a replay that leans on it is visible rather than silent.
+        What this replays is therefore "the decisions the model made, in order",
+        which is what reproducing a run means here. It trusts position over
+        content, so it is tried only after both content-based lookups fail and is
+        counted separately -- a replay leaning on it shows up in the stats rather
+        than passing silently.
         """
         if not self.dir.is_dir():
             return None
-        if self._by_length is None:
-            self._by_length = {}
+        if self._sequence is None:
+            records = []
             for path in sorted(self.dir.glob("*.json")):
                 try:
-                    record = json.loads(path.read_text(encoding="utf-8"))
+                    records.append(json.loads(path.read_text(encoding="utf-8")))
                 except (OSError, json.JSONDecodeError):
                     continue
-                self._by_length.setdefault(len(record.get("messages") or []), record["response"])
+            records.sort(key=lambda r: len(r.get("messages") or []))
+            self._sequence = [r["response"] for r in records]
 
-        response = self._by_length.get(len(messages))
-        if response is not None:
-            self.hits += 1
-            self.positional_hits += 1
+        if self._cursor >= len(self._sequence):
+            return None
+        response = self._sequence[self._cursor]
+        self._cursor += 1
+        self.hits += 1
+        self.positional_hits += 1
         return response
 
     def put(self, key: str, model: str, messages: list[dict], response: dict) -> None:

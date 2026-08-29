@@ -75,7 +75,7 @@ class _CassettedCompletion:
             # Tool output is re-executed on replay and can differ in ways
             # normalisation does not cover, so fall back to position in the
             # conversation. Counted separately in the cassette stats.
-            cached = self.cassette.get_positional(keyed)
+            cached = self.cassette.get_sequential()
         if cached is not None:
             return litellm.ModelResponse(**cached["response"])
 
