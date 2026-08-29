@@ -27,8 +27,21 @@ agent:
   # step_limit is injected from patch_guard.config.BASELINE_STEP_LIMIT at load
   # time so the budget has a single source of truth. It is documented there,
   # and the fairness claim in the README depends on it actually being applied.
-  cost_limit: 0.0          # free tier; cost tracking is not the constraint here
-  max_consecutive_format_errors: 3
+  cost_limit: 0.0          # cost tracking is not the constraint here
+
+  # gpt-oss-20b uses the harmony format, where reasoning and the final answer
+  # are separate channels. It intermittently spends a whole turn in the
+  # reasoning channel and returns an empty final one with no tool call --
+  # measured at finish_reason=stop with ~418 completion tokens, all reasoning.
+  # mini-swe-agent's own recovery handles this well: it appends "No tool calls
+  # found in the response", which changes the prompt, and the next turn
+  # normally acts. Runs were dying only on three of these in a row.
+  #
+  # Raised from the default 3. This is deliberately an allowance in the
+  # BASELINE's favour -- it gives the unsupervised agent more chances to
+  # produce a patch, so the gap the gates reveal cannot be blamed on the
+  # baseline being cut off early.
+  max_consecutive_format_errors: 8
 
   system_template: |
     You are a careful software engineer fixing a bug in a small Python repository.

@@ -24,7 +24,9 @@ from baseline.resilient_model import ResilientLitellmModel  # noqa: E402
 from eval import harness  # noqa: E402
 from patch_guard import config  # noqa: E402
 from patch_guard.cassettes import Cassette, key_for  # noqa: E402
-from patch_guard.ratelimit import BUCKET, estimate_prompt_tokens  # noqa: E402
+from patch_guard.ratelimit import (  # noqa: E402
+    BUCKET, QuotaExhausted, estimate_prompt_tokens, is_quota_exhausted,
+)
 from patch_guard.trace import Trajectory  # noqa: E402
 from patch_guard.workspace import Workspace  # noqa: E402
 
@@ -111,10 +113,16 @@ class BaselineRunner:
 
         # Native tool calling, with upstream's FormatError path used to absorb
         # Groq's occasional malformed-tool-call rejection. See resilient_model.py.
+        model_kwargs = {"temperature": config.TEMPERATURE,
+                        "max_tokens": config.MAX_OUTPUT_TOKENS}
+        # Pin the OpenRouter backend. Unpinned, some backends return the model's
+        # reasoning with an empty final channel and no tool call, which scores as
+        # the agent failing to act. See config.OPENROUTER_PROVIDERS.
+        if routing := config.provider_routing():
+            model_kwargs["extra_body"] = routing
         model = ResilientLitellmModel(
             model_name=config.MODEL,
-            model_kwargs={"temperature": config.TEMPERATURE,
-                          "max_tokens": config.MAX_OUTPUT_TOKENS},
+            model_kwargs=model_kwargs,
             cost_tracking="ignore_errors",
         )
         # Bash-backed: upstream LocalEnvironment documents bash but uses
@@ -128,9 +136,20 @@ class BaselineRunner:
         try:
             result = agent.run(task=_task_for(case, ws))
         except Exception as exc:
+            # mini-swe-agent catches the provider error internally and returns a
+            # normal result, so the daily-ceiling check also runs on the exit
+            # status below. This branch covers the case where it propagates.
+            if is_quota_exhausted(exc):
+                raise QuotaExhausted(str(exc)) from exc
             result = {"exit_status": f"{type(exc).__name__}: {exc}", "submission": ""}
         finally:
             litellm.completion = real_completion
+
+        # A run that died on the daily token ceiling measured nothing about the
+        # agent. Recording it as a failed case would deflate the baseline's
+        # score with a quota artefact.
+        if is_quota_exhausted(str(result.get("exit_status", ""))):
+            raise QuotaExhausted(str(result.get("exit_status")))
 
         self._record(traj, agent, result)
         traj.render_markdown()

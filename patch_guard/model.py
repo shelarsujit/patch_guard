@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from patch_guard import config
 from patch_guard.cassettes import Cassette
-from patch_guard.ratelimit import BUCKET, estimate_prompt_tokens
+from patch_guard.ratelimit import (
+    BUCKET, QuotaExhausted, estimate_prompt_tokens, is_quota_exhausted,
+)
 
 
 class WorkerModel:
@@ -59,12 +61,20 @@ class WorkerModel:
         reserved = estimate_prompt_tokens(messages) + config.MAX_OUTPUT_TOKENS
         BUCKET.reserve(reserved)
 
-        completion = litellm.completion(
-            model=self.model,
-            messages=messages,
-            temperature=config.TEMPERATURE,
-            max_tokens=config.MAX_OUTPUT_TOKENS,
-        )
+        try:
+            completion = litellm.completion(
+                model=self.model,
+                messages=messages,
+                temperature=config.TEMPERATURE,
+                max_tokens=config.MAX_OUTPUT_TOKENS,
+                **({"extra_body": routing} if (routing := config.provider_routing(self.model)) else {}),
+            )
+        except Exception as exc:
+            # Running out of the daily budget says nothing about the worker, so
+            # it must not reach the graph as a failed patch attempt.
+            if is_quota_exhausted(exc):
+                raise QuotaExhausted(str(exc)) from exc
+            raise
         choice = completion.choices[0]
         usage = getattr(completion, "usage", None)
         if usage is not None:

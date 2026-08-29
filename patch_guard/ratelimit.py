@@ -35,6 +35,31 @@ HEADROOM = 0.85
 WINDOW_SECONDS = 60.0
 
 
+class QuotaExhausted(RuntimeError):
+    """The provider's daily token budget is gone.
+
+    This is emphatically *not* a case result. A recording sweep that hits the
+    daily ceiling has learned nothing about the agent, so scoring the case would
+    file a quota artefact as an agent failure -- the same class of bug that made
+    a provider rejection look like a bad patch. The sweep stops instead, keeps
+    whatever it recorded, and says how long until the window reopens.
+    """
+
+
+def is_quota_exhausted(exc: object) -> bool:
+    """True when `exc` is a tokens-per-day rejection rather than a per-minute one.
+
+    Accepts an exception or an exit-status string: mini-swe-agent swallows the
+    provider error and reports it as a status, so both shapes occur.
+
+    The daily ceiling is invisible until it is hit: the x-ratelimit-* response
+    headers advertise only the per-minute token limit and the request limit, so
+    the only evidence of a TPD cap is the rejection itself.
+    """
+    text = str(exc)
+    return "rate_limit" in text and ("tokens per day" in text or "TPD" in text)
+
+
 def estimate_prompt_tokens(messages) -> int:
     """Rough prompt size from message text.
 
@@ -94,6 +119,28 @@ class TokenBucket:
                     return
 
 
+class _NullBucket:
+    """No-op limiter for providers without a per-minute token ceiling.
+
+    Pacing against a limit that does not exist would spend hours of wall-clock
+    buying nothing, so the pacer disappears rather than being merely generous.
+    """
+
+    def reserve(self, tokens: float) -> float:
+        return 0.0
+
+    def settle(self, reserved: float, actual: float) -> None:
+        return None
+
+
+def bucket_for(model: str | None = None):
+    """The limiter appropriate to `model`'s provider."""
+    from patch_guard import config
+
+    tpm = config.tpm_limit(model)
+    return TokenBucket(tpm=tpm) if tpm else _NullBucket()
+
+
 #: Process-wide bucket. Both runners talk to the same provider account, so the
 #: ceiling is shared and the limiter must be too.
-BUCKET = TokenBucket()
+BUCKET = bucket_for()

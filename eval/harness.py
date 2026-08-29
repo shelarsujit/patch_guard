@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from eval.metric import CaseResult, Summary, dump, summarize  # noqa: E402
 from patch_guard import config, gates, workspace  # noqa: E402
+from patch_guard.ratelimit import QuotaExhausted  # noqa: E402
 
 
 class Runner(Protocol):
@@ -81,6 +82,15 @@ def run(runner: Runner, cases: list[dict], out_path: Path,
         ws = workspace.build(case, scratch / case["case_id"] / "repo")
         try:
             report = runner(case, ws)
+        except QuotaExhausted:
+            # Not a result. Scoring this case would record the provider's daily
+            # ceiling as an agent failure and silently deflate the headline
+            # number. Stop, keep what was recorded, and let the caller report it.
+            if verbose:
+                print(f"\n  quota exhausted before {case['case_id']} -- stopping.\n"
+                      f"  {len(results)}/{len(cases)} cases recorded; cassettes for those\n"
+                      f"  replay for free, so re-running resumes where this left off.")
+            break
         except Exception as exc:  # a crashed runner is a result, not an abort
             report = {"done_claim": False, "exit_status": f"RunnerError: {type(exc).__name__}: {exc}"}
         report.setdefault("wall_seconds", time.time() - started)
