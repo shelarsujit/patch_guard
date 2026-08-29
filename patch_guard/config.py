@@ -18,13 +18,29 @@ except ImportError:  # replay needs no key, so a missing dotenv must not be fata
     pass
 
 QUIXBUGS_DIR = REPO_ROOT / "eval" / "data" / "quixbugs"
+
+# A second, synthetic source tree whose programs share a module. QuixBugs
+# programs are independent files, so no single-file patch there can break
+# another program's tests -- which makes the regression gate unmeasurable on it.
+# See eval/data/coupled/README.md.
+COUPLED_DIR = REPO_ROOT / "eval" / "data" / "coupled"
+
+#: Source trees a case may draw from, addressed by name in the case JSON so the
+#: harness never hard-codes one layout.
+SOURCE_TREES = {"quixbugs": QUIXBUGS_DIR, "coupled": COUPLED_DIR}
+
+
+def source_tree(name: str | None) -> Path:
+    return SOURCE_TREES.get(name or "quixbugs", QUIXBUGS_DIR)
+
+
 CASES_DIR = REPO_ROOT / "eval" / "cases"
 CASSETTES_DIR = REPO_ROOT / "cassettes"
 TRAJECTORIES_DIR = REPO_ROOT / "trajectories"
 RESULTS_DIR = REPO_ROOT / "results"
 SCRATCH_DIR = REPO_ROOT / ".scratch"
 
-# The 10 evaluated programs, in the order build_cases.py emits them.
+# The 10 evaluated QuixBugs programs, in the order build_cases.py emits them.
 PROGRAMS = [
     "bitcount",
     "breadth_first_search",
@@ -37,6 +53,10 @@ PROGRAMS = [
     "shortest_path_length",
     "topological_ordering",
 ]
+
+# The coupled family. `textlib` is imported by the other three, so a patch to it
+# reaches tests belonging to programs the agent was not asked to touch.
+COUPLED_PROGRAMS = ["textlib", "slugify", "initials", "split_sentences"]
 
 # Paths the agent must never modify. python_testcases/ is the obvious one;
 # json_testcases/ holds the expected outputs the parametrized tests assert

@@ -183,7 +183,7 @@ class GoldRunner:
     name = "gold"
 
     def __call__(self, case: dict, ws: workspace.Workspace) -> dict:
-        workspace.apply_gold_patch(ws, case["program"])
+        workspace.apply_gold_patch(ws, case["program"], case=case)
         return {"done_claim": True, "steps": 1, "exit_status": "GoldPatch"}
 
 

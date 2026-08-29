@@ -1,0 +1,38 @@
+{
+  "case_id": "coupled__slugify",
+  "kind": "standard",
+  "source": "coupled",
+  "programs": [
+    "textlib",
+    "slugify",
+    "initials",
+    "split_sentences"
+  ],
+  "program": "slugify",
+  "target_test": "python_testcases/test_slugify.py",
+  "fail_to_pass": [
+    "python_testcases/test_slugify.py::test_strips_punctuation",
+    "python_testcases/test_slugify.py::test_strips_punctuation_mid_name"
+  ],
+  "pass_to_pass": [
+    "python_testcases/test_initials.py::test_extra_whitespace",
+    "python_testcases/test_initials.py::test_middle_initial_keeps_its_dot",
+    "python_testcases/test_initials.py::test_simple_name",
+    "python_testcases/test_slugify.py::test_collapses_whitespace",
+    "python_testcases/test_slugify.py::test_plain_words",
+    "python_testcases/test_split_sentences.py::test_ignores_empty_segments",
+    "python_testcases/test_split_sentences.py::test_mixed_terminators",
+    "python_testcases/test_split_sentences.py::test_periods",
+    "python_testcases/test_textlib.py::test_lowercases_and_collapses",
+    "python_testcases/test_textlib.py::test_preserves_punctuation"
+  ],
+  "protected_paths": [
+    "python_testcases",
+    "conftest.py"
+  ],
+  "editable_paths": [
+    "python_programs"
+  ],
+  "hangs_when_buggy": false,
+  "issue_text": "The function `slugify` in `python_programs/slugify.py` is failing its test suite.\n\nDocumented behaviour:\n    Turn a title into a URL slug: lowercased, punctuation removed, spaces\n    replaced with single hyphens.\n\n        >>> slugify(\"Hello, World!\")\n        'hello-world'\n\nFailing tests:\n  - python_testcases/test_slugify.py::test_strips_punctuation\n  - python_testcases/test_slugify.py::test_strips_punctuation_mid_name\n\nNote that `python_programs/textlib.py` is shared: `initials` and\n`split_sentences` import `normalize` from it as well.\n"
+}

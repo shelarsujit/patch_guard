@@ -164,14 +164,18 @@ def build(case: dict, dest: Path, source: Path | None = None) -> Workspace:
     nothing. The harness still reads gold from the vendored source when it needs
     it (see `apply_gold_patch`); the agent never sees it.
     """
-    source = source or config.QUIXBUGS_DIR
+    # The case names its own source tree and its own program list, so a second
+    # family with a different shape needs no change here. Defaults keep the
+    # QuixBugs cases working unchanged.
+    source = source or config.source_tree(case.get("source"))
+    programs = case.get("programs") or config.PROGRAMS
     dest = _clear_dest(dest)
     shutil.copytree(source, dest, ignore=shutil.ignore_patterns(
         "correct_python_programs", "PROVENANCE.json", "__pycache__"))
 
     # Start from all-gold, then reintroduce exactly one bug. Gold is read from
     # the vendored source, which stays outside the agent's reach.
-    for program in config.PROGRAMS:
+    for program in programs:
         gold = source / "correct_python_programs" / f"{program}.py"
         if gold.is_file():
             shutil.copy2(gold, dest / "python_programs" / f"{program}.py")
@@ -195,7 +199,8 @@ def build(case: dict, dest: Path, source: Path | None = None) -> Workspace:
     return Workspace(root=dest, case_id=case["case_id"], baseline=_snapshot(dest))
 
 
-def apply_gold_patch(ws: Workspace, program: str, source: Path | None = None) -> None:
+def apply_gold_patch(ws: Workspace, program: str, source: Path | None = None,
+                     case: dict | None = None) -> None:
     """Overwrite the buggy program with its gold version.
 
     Reads gold from the vendored source rather than from the workspace, because
@@ -204,6 +209,6 @@ def apply_gold_patch(ws: Workspace, program: str, source: Path | None = None) ->
     This is the harness's self-test: gold must score a perfect net-resolved run.
     If it does not, the metric is wrong and nothing downstream can be believed.
     """
-    source = source or config.QUIXBUGS_DIR
+    source = source or config.source_tree((case or {}).get("source"))
     gold = source / "correct_python_programs" / f"{program}.py"
     shutil.copy2(gold, ws.root / "python_programs" / f"{program}.py")
