@@ -93,10 +93,17 @@ def run(runner: Runner, cases: list[dict], out_path: Path,
             break
         except Exception as exc:  # a crashed runner is a result, not an abort
             report = {"done_claim": False, "exit_status": f"RunnerError: {type(exc).__name__}: {exc}"}
+            if verbose:
+                print(f"  [runner error] {case['case_id']}: {type(exc).__name__}: {exc}")
         report.setdefault("wall_seconds", time.time() - started)
 
         result = score(case, ws, report, runner.name)
         results.append(result)
+        # Write after every case, not once at the end. A sweep costs tokens and
+        # wall-clock, and an exception on case five previously discarded the
+        # four that had already succeeded. Rewriting the whole file each time is
+        # trivially cheap at this scale and keeps the file valid throughout.
+        dump(results, out_path)
 
         if verbose:
             mark = "PASS" if result.net_resolved else "FAIL"

@@ -128,6 +128,55 @@ than to prompt quality, which is the only comparison worth publishing.
 
 ---
 
+## 5 — At this model tier, most apparent agent failure is harness artifact
+
+**What I tried and why.** The intent was simply to run the recording sweep. What
+actually happened is the finding: nine distinct infrastructure faults surfaced,
+each of which would have produced a *number* rather than an error, and each of
+which a reasonable person would have read as the agent behaving badly.
+
+| # | Fault | Would have been scored as |
+|---|---|---|
+| 1 | `correct_python_programs/` copied into the workspace | **100% net-resolved, measuring nothing** |
+| 2 | Sibling case workspaces reachable via `..` | agent "found" fixes by reading other cases |
+| 3 | `FormatError` raised inside upstream's tenacity loop — 10 identical retries, then episode death | agent failed to produce a valid edit |
+| 4 | `FormatError(...)` given a list where varargs were expected | crash, once fault 3 was fixed |
+| 5 | Groq's undocumented 200k tokens/day ceiling | `target-failed` |
+| 6 | OpenRouter routing to a backend that drops the harmony final channel | agent failed to act |
+| 7 | Model wedged in the reasoning channel; identical retry at temperature 0 | repeated format errors, episode death |
+| 8 | Orphaned `pytest` surviving its shell, holding a pipe open | sweep hangs, indistinguishable from working |
+| 9 | Same orphan locking the workspace directory | crash discarding four completed cases |
+
+**Evidence.** Each is measured, not inferred. Fault 6 was isolated by sending one
+request to every backend serving the model: Darkbloom returned `finish=stop` with
+no tool call; CoreWeave, DeepInfra, Parasail and Bedrock returned `finish=tool_calls`.
+Fault 7 by holding a wedged conversation fixed and varying one setting at a time —
+`tool_choice=required`, excluding reasoning, and raising temperature all failed;
+only `reasoning effort=low` recovered. Fault 8 by timing the exact shape that hung:
+5.4s against a 5s limit, where before it never returned. Fault 1 is now pinned by
+`test_gold_implementations_are_not_visible_to_the_agent`, fault 8 by
+`test_a_runaway_grandchild_cannot_hang_the_sweep`.
+
+**Decision / Learning.** Two things follow, and the second is uncomfortable.
+
+First, the published failure-mode literature is measured on frontier models
+through mature harnesses. At the 20B open-weight tier the harness itself is a
+dominant source of apparent incompetence, and a paper reporting "the cheap model
+scored X" without controlling for these is not obviously measuring the model.
+That is a methodological claim this project can support with receipts.
+
+Second — and this is the disclosure that matters — **faults 3, 6, 7 and 8 hit the
+baseline and not the supervisor.** The baseline drives tool calls through a real
+shell; the supervisor makes a single text completion and never runs a command. So
+the artifact-prone surface is almost entirely on the side this project wants to
+look worse. Every one of those bugs, left unfixed, would have widened the measured
+gap in Patch-Guard's favour. They were found and fixed *before* the numbers were
+recorded, which is the only ordering that makes the comparison worth anything, and
+it is the reason the fixes are itemised here rather than quietly folded into a
+commit labelled "misc fixes".
+
+---
+
 ## Open
 
 - **Recording run not yet performed.** Everything is implemented, tested and wired;
