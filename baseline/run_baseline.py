@@ -12,6 +12,7 @@ baseline credible: the comparison isolates supervision, not prompt quality.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -51,9 +52,18 @@ class _CassettedCompletion:
 
         model = kwargs.get("model", "")
         messages = kwargs.get("messages", [])
-        # Tool definitions are part of the request, so they belong in the key --
-        # otherwise a changed tool schema would silently replay stale decisions.
-        keyed = messages + [{"role": "_tools", "content": str(kwargs.get("tools", ""))}]
+        # Anything that changes the reply belongs in the key, or a config change
+        # silently replays decisions made under the old one. That is not
+        # hypothetical: a sweep recorded 83 replies with no tool call, and
+        # without the sampling fields here those would have replayed intact
+        # through every later fix.
+        keyed = messages + [
+            {"role": "_tools", "content": str(kwargs.get("tools", ""))},
+            {"role": "_sampling", "content": json.dumps({
+                "max_tokens": kwargs.get("max_tokens"),
+                "extra_body": kwargs.get("extra_body"),
+            }, sort_keys=True)},
+        ]
         key = key_for(model, keyed, config.TEMPERATURE)
 
         cached = self.cassette.get(key)
