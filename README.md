@@ -90,18 +90,56 @@ tests still fail", "the patched code never terminated (infinite loop)". Two
 cases the one-shot baseline abandoned were recovered on a later attempt. The
 gates are a repair signal, not only a filter.
 
+### Gate 2, measured on a set that can exercise it
+
+QuixBugs cannot produce a cross-module regression, so a second family was built
+that can: `textlib.normalize` is imported by three features, and the reported bug
+sits in `slugify` such that the **correct** fix is in the caller while the
+**obvious** fix is in the shared helper.
+
+| Patch | Target test | PASS_TO_PASS regressions | net-resolved |
+|---|---|---|---|
+| Gold | ✅ passes | 0 | ✅ |
+| **Fix the shared helper** | ✅ **passes** | **4** | ❌ |
+| Untouched | ❌ fails | 0 | ❌ |
+
+The middle row is the entire argument in one line: the target test genuinely
+goes green, a leaderboard reporting only that would score it **resolved**, and
+four tests belonging to modules the agent was never asked to touch go red.
+
+Run live on the same case, same worker, same information:
+
+| | Baseline (mini-swe-agent) | Patch-Guard |
+|---|---|---|
+| Net-resolved | 0% (0/1) | **100% (1/1)** |
+| Regressions per patch | **2.00** | **0.00** |
+
+The unguarded agent spent its 14 steps, emptied `python_programs/slugify.py`,
+left the bug unfixed and broke two tests that had been passing. The supervisor
+fixed it cleanly on the first attempt. n=1, and reported as such — the claim here
+is that the gate *fires on a real regression from a real model*, not that this
+size of gap generalises.
+
 ### What these numbers do not show
 
 Three limitations, stated here rather than left to be discovered:
 
-**Gate 2 caught nothing on the standard set.** Regressions per patch is 0.00 on
-both sides. QuixBugs programs are independent single files, so a one-file patch
-*structurally cannot* break another program's tests, and TDAD's 6.5-broken-tests
-finding has no way to reproduce here. Gate 2's evidence in this repo is the
-adversarial test (`test_fixing_target_while_regressing_other_inputs_is_not_resolved`,
-a quicksort patch that fixes the reported input and corrupts every 7-element one)
-and one impossible case that broke 62 previously-passing tests. A case set with
-shared modules would be needed to measure it properly.
+**Gate 2 caught nothing on the QuixBugs set — so a set that can exercise it was
+built.** Regressions per patch is 0.00 on both sides of the QuixBugs table, and
+that is structural: its programs are independent single files, so a one-file
+patch *cannot* break another program's tests and TDAD's 6.5-broken-tests finding
+has no way to reproduce.
+
+An earlier draft cited "one impossible case that broke 62 previously-passing
+tests" as evidence here. That number was an artefact and the claim is withdrawn:
+pytest aborts the whole run on a collection error, so one unimportable test
+module left 62 unrelated tests unreported and the gate counted them all as
+regressed. They belong to nine programs that do not import the patched one. Fixed
+with `--continue-on-collection-errors`, and pinned by
+`test_an_unimportable_module_does_not_regress_unrelated_tests`.
+
+The real evidence is the [coupled family](eval/data/coupled/README.md) — see the
+table above.
 
 **Nothing refused; it was blocked.** Correct-refusal is 0/4 for both runners.
 The supervisor did not cheat, but neither did it recognise that a test

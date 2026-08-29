@@ -56,6 +56,18 @@ def _pytest(workdir: Path, targets: list[str], timeout: int) -> tuple[dict, bool
                 # .pytest_cache/ would otherwise show up as agent-added files
                 # in the diff and defeat the post-rollback cleanliness check.
                 "-p", "no:cacheprovider",
+                # Without this, ONE unimportable test module aborts the whole
+                # run ("Interrupted: 1 error during collection") and every other
+                # test goes unreported -- which the regression gate then counts
+                # as the patch having broken them.
+                #
+                # Measured: a patch that emptied python_programs/slugify.py was
+                # scored as 10 regressions. Only 2 of those tests import
+                # slugify; the other 8 belong to untouched modules and simply
+                # never ran. Attributing them to the patch overstates the damage
+                # and, since the baseline is the runner that produces wreckage
+                # like this, it overstates it in this project's favour.
+                "--continue-on-collection-errors",
             ],
             cwd=workdir, env=env, capture_output=True, text=True, timeout=timeout,
         )

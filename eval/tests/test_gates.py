@@ -340,3 +340,30 @@ def test_coupled_case_has_a_real_regression_surface(coupled_case):
     assert coupled_case["source"] == "coupled"
     others = [n for n in coupled_case["pass_to_pass"] if "test_slugify" not in n]
     assert others, "the regression surface must include other programs' tests"
+
+
+def test_an_unimportable_module_does_not_regress_unrelated_tests(coupled_case, tmp_path):
+    """One broken import must not be scored as breaking the whole suite.
+
+    pytest aborts the entire run on a collection error -- "Interrupted: 1 error
+    during collection" -- so every other test goes unreported. Counting those as
+    regressions attributes damage to a patch that did not cause it.
+
+    Measured before the fix: emptying python_programs/slugify.py scored 10
+    regressions, when only the 2 tests that import slugify can possibly break.
+    The same artefact inflated a QuixBugs impossible case to 62 regressions
+    across nine test files belonging to programs that do not import the patched
+    one at all.
+
+    The bias runs in this project's favour, which is why it is pinned: the
+    baseline is the runner that produces unimportable wreckage, so the artefact
+    made the unguarded agent look worse than it is.
+    """
+    ws = workspace.build(coupled_case, tmp_path / "unimportable")
+    ws.write("python_programs/slugify.py", "\n")
+
+    r = _score(coupled_case, ws, {"done_claim": False})
+
+    assert len(r.regressions) == 2, "only the tests that import slugify may regress"
+    assert all("test_slugify" in n for n in r.regressions), \
+        "untouched modules must not be blamed for a collection abort"

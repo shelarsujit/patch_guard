@@ -249,15 +249,63 @@ supervised architecture that has nothing to do with the gates.
 
 ---
 
+## 8 — Building the case set that could falsify gate 2
+
+**What I tried and why.** Gate 2 was the only gate this project asserted rather
+than demonstrated. Its number read 0.00 for every runner on every sweep, and the
+reason was structural rather than flattering: QuixBugs programs are independent
+single files, so no one-file patch can break another program's tests. An
+evaluation set that cannot produce a failure mode cannot provide evidence about
+a gate that catches it.
+
+So I built one that can. `eval/data/coupled/` places `textlib.normalize` behind
+three callers and puts the bug where the locally-correct fix and the globally-
+correct fix differ.
+
+**Evidence.**
+
+| Patch | Target | P2P regressions | net_resolved |
+|---|---|---|---|
+| gold | pass | 0 | True |
+| fix in the shared helper | **pass** | **4** | False |
+| untouched | fail | 0 | False |
+
+Live, on the same case: baseline 0% net-resolved with 2.00 regressions per
+patch; supervisor 100% with 0.00. The baseline emptied `slugify.py` outright.
+
+**Decision / Learning.** Two things came out of this that were not the point of
+the exercise.
+
+First, the exercise immediately found a scoring bug that had been inflating the
+regression counts everywhere. pytest aborts the whole run on a collection error,
+so one unimportable module left every other test unreported and the gate counted
+all of them as regressed -- 10 on this case where only 2 tests could break, and
+62 on a QuixBugs impossible case, across nine programs that do not import the
+patched one. That last figure had been published as gate 2's evidence. It is
+withdrawn, the fix is `--continue-on-collection-errors`, and the invariant is
+pinned by a test. Like the artefacts in entry 5 this one flattered the thesis:
+the baseline is the runner that produces unimportable wreckage.
+
+Second, it is worth being explicit that this family is synthetic and that a
+synthetic case set can be tuned until it says what its author wants. The
+mitigation is that the bug is not hidden -- it is a plausible bug whose obvious
+fix has non-local consequences -- that FAIL_TO_PASS and PASS_TO_PASS are derived
+by measurement and the builder refuses to emit a case whose all-gold tree is not
+green, and that the whole tree is committed for inspection. n=1 on the live run,
+and reported as n=1.
+
+---
+
 ## Open
 
 - **Gate 2 is unmeasured on the standard set.** Regressions per patch is 0.00 for
   both runners. QuixBugs programs are independent single files, so a one-file
   patch structurally cannot break another program's tests — TDAD's
   6.5-broken-tests-per-patch has no way to reproduce here. The gate is exercised
-  by an adversarial test and by one impossible case that broke 62 previously
-  passing tests, but a case set with genuinely shared modules is needed to
-  measure it. This is a limitation of the evaluation set, not of the gate.
+  by an adversarial test, and a case set with genuinely shared modules was built
+  to measure it properly -- see entry 8. An earlier version of this bullet cited
+  "one impossible case that broke 62 previously passing tests"; that figure was a
+  collection-abort artefact and is withdrawn.
 - **Nothing refused; it was blocked.** Correct-refusal is 0/4 for both runners.
   The supervisor never cheated, but it also never recognised the contradiction
   and said so — the `REFUSE` path never fired. Harm prevented, diagnosis not made.
