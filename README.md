@@ -30,7 +30,7 @@ well documented:
 
 | Failure mode | Evidence |
 |---|---|
-| Declaring success without verification | ETH Zurich SRI Lab: agents submit patches to already-correct code in **over 50%** of cases; no model exceeds 70% at correctly staying idle. |
+| Declaring success without verification | ETH Zurich SRI Lab, [FixedBench](https://arxiv.org/html/2605.07769): on issues that are *already resolved*, agents abstain correctly only **57.6–65.0%** of the time in the most favourable configuration measured (Sonnet-4.6 65.0%, GPT-5.4 mini 60.5%, GPT-5.3 Codex 57.6%) — they modify correct code in roughly a third of cases at best. A prompt framing abstention as success lifts this to 80.5–88.5%, at the cost of over-abstaining on partially-fixed code. |
 | Introducing regressions | TDAD (arXiv:2603.17973): a vanilla agent caused **562 pass-to-pass failures across 100 instances — 6.5 broken tests per patch**. |
 | Reward hacking by editing tests | ImpossibleBench (arXiv:2510.20270): GPT-5 **cheats 54.0%** of the time on Conflicting-SWEbench; making tests read-only drives it toward zero. |
 
@@ -47,14 +47,75 @@ net_resolved = target tests pass
            AND no protected test file modified
 ```
 
-SWE-bench's harness already records PASS_TO_PASS; leaderboards report only the
-first condition. Reporting the conjunction is the entire point: **a patch that buys
-a green target test by breaking two other tests has not resolved anything.**
+To be precise about what is and is not new here: **SWE-bench's `resolved` metric
+already requires both FAIL_TO_PASS and PASS_TO_PASS.** An earlier draft of this
+README claimed leaderboards report only the first condition. That was wrong, and
+it is corrected rather than quietly deleted because the distinction matters.
+
+The real gap is narrower. SWE-bench runs only *the test files modified by the
+PR's test patch*, so a regression anywhere outside those files is invisible to
+the metric. Patch-Guard's regression gate sweeps the whole suite and pins every
+previously-passing node id, which is why `net_resolved` here is a stricter
+condition than `resolved` there rather than a rediscovery of it.
+
+The conjunction is still the point: **a patch that buys a green target test by
+breaking two other tests has not resolved anything.**
 
 Secondary columns: regressions per patch, cheat rate, correct-refusal rate,
 overclaim rate, wall-clock, cost.
 
 Results — generated, never hand-typed — live in [`results/report.md`](results/report.md).
+
+## Related work — what this replicates, and what it tests
+
+These failure modes are an active field, not an unclaimed gap. Being precise
+about the boundary is the point of this section.
+
+**[ECLoop](https://arxiv.org/abs/2607.28815) (arXiv:2607.28815)** is the closest
+prior art and gates the same failure mode. It compiles *evidence conditions* from
+the issue text and repository structure, then postpones any edit or submission
+until the agent has observed enough to justify it. On SWE-bench Verified it adds
+4.8–11.8 Pass@1 points across two models and two scaffolds.
+
+Three differences define what is left to test:
+
+| | ECLoop | Patch-Guard |
+|---|---|---|
+| Gate fires | **before** the action | **after** the patch |
+| Signal | what the agent *observed* — inspected locations, executed commands | whether the code *works* — pytest exit codes and node ids |
+| Runs tests as the gate | no | yes |
+| Regressions (PASS_TO_PASS) | not addressed | gate 2 |
+| Test-file editing / reward hacking | not addressed | gate 3 |
+
+The last two are stated absences in ECLoop's own limitations, not an inference
+drawn here.
+
+**ECLoop's negative result is the sharper reason this is worth measuring.** It
+compares against Self-Refine and finds post-hoc review *degrades* performance
+(−1.4pp and −1.8pp), concluding that "post hoc self-review cannot recover from
+decisions made on insufficient evidence." That result is about **LLM
+self-review**. A pytest exit code is not a review: it does not reason about the
+evidence the agent gathered, and it cannot be argued out of a failing assertion.
+Whether deterministic post-hoc execution succeeds where post-hoc LLM review
+failed is an open question, and it is the one this project answers.
+
+**Why a cheap worker model.** Not merely a budget constraint. ECLoop's gains are
+roughly twice as large on the weaker of its two models, consistently across both
+scaffolds — GPT-5-mini +11.8 and +10.4, MiniMax-M2.5 +4.8 and +5.0. If gating
+matters most where the model is weakest, the 20B open-weight tier is where these
+mechanisms should be tested, and it is the tier most teams can actually deploy.
+
+**[EvilGenie](https://arxiv.org/abs/2511.21654) (arXiv:2511.21654)** benchmarks
+reward hacking and, like gate 3, detects test-file edits. It scores on
+LiveCodeBench competitive-programming problems rather than repository issues, and
+its finding is that the **LLM judge** does most of the detection work while
+held-out tests add little. Patch-Guard uses no LLM judge anywhere: every verdict
+is a test outcome or a file hash. The overlap is the detector, not the method.
+
+**[FixedBench](https://arxiv.org/html/2605.07769)** supplies the premature-completion
+evidence cited above. Note for anyone extending this: it reports that harness
+choice had little effect and that *all* tested models show the action bias — it
+does **not** report that frontier models self-verify while weaker ones do not.
 
 ## Does the agent solve it well?
 
