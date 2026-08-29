@@ -20,6 +20,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from baseline.bash_env import BashEnvironment  # noqa: E402
+from baseline.resilient_model import ResilientLitellmModel  # noqa: E402
 from eval import harness  # noqa: E402
 from patch_guard import config  # noqa: E402
 from patch_guard.cassettes import Cassette, key_for  # noqa: E402
@@ -66,6 +67,22 @@ class _CassettedCompletion:
         return response
 
 
+def _task_for(case: dict, ws: Workspace) -> str:
+    """The task text handed to the baseline agent.
+
+    Deliberately mirrors the supervisor's first patch prompt: same issue text,
+    same file path, same file contents. The supervisor's `localize` node gives
+    its worker exactly this, so giving the baseline less would mean measuring
+    localization ability rather than the effect of the gates.
+    """
+    rel = f"python_programs/{case['program']}.py"
+    return (
+        f"{case['issue_text']}\n\n"
+        f"The buggy implementation is `{rel}`. Its current contents:\n\n"
+        f"```python\n{ws.read(rel).rstrip()}\n```\n"
+    )
+
+
 class BaselineRunner:
     name = "baseline"
 
@@ -76,12 +93,13 @@ class BaselineRunner:
     def __call__(self, case: dict, ws: Workspace) -> dict:
         import litellm
         from minisweagent.agents.default import DefaultAgent
-        from minisweagent.models.litellm_model import LitellmModel
 
         traj = Trajectory(case["case_id"], self.run_label, config.TRAJECTORIES_DIR)
         cassette = Cassette(case["case_id"] + "__baseline")
 
-        model = LitellmModel(
+        # Native tool calling, with upstream's FormatError path used to absorb
+        # Groq's occasional malformed-tool-call rejection. See resilient_model.py.
+        model = ResilientLitellmModel(
             model_name=config.MODEL,
             model_kwargs={"temperature": config.TEMPERATURE,
                           "max_tokens": config.MAX_OUTPUT_TOKENS},
@@ -96,7 +114,7 @@ class BaselineRunner:
         real_completion = litellm.completion
         litellm.completion = _CassettedCompletion(cassette, real_completion)
         try:
-            result = agent.run(task=case["issue_text"])
+            result = agent.run(task=_task_for(case, ws))
         except Exception as exc:
             result = {"exit_status": f"{type(exc).__name__}: {exc}", "submission": ""}
         finally:

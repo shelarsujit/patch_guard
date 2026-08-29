@@ -33,3 +33,5 @@ Thumbs.db
 trajectories/test/
 trajectories/trajtest/
 results/test*.jsonl
+trajectories/smoke*/
+results/_smoke*

@@ -122,15 +122,25 @@ class Workspace:
 
 
 def build(case: dict, dest: Path, source: Path | None = None) -> Workspace:
-    """Materialize `case`'s workspace at `dest` and take its pristine snapshot."""
+    """Materialize `case`'s workspace at `dest` and take its pristine snapshot.
+
+    The gold implementations are deliberately NOT copied in. QuixBugs ships
+    `correct_python_programs/` alongside the buggy ones, and an agent that can
+    see it can solve every case with `cp correct_python_programs/x.py
+    python_programs/x.py`. That would score a perfect run while measuring
+    nothing. The harness still reads gold from the vendored source when it needs
+    it (see `apply_gold_patch`); the agent never sees it.
+    """
     source = source or config.QUIXBUGS_DIR
     if dest.exists():
         shutil.rmtree(dest)
-    shutil.copytree(source, dest)
+    shutil.copytree(source, dest, ignore=shutil.ignore_patterns(
+        "correct_python_programs", "PROVENANCE.json", "__pycache__"))
 
-    # Start from all-gold, then reintroduce exactly one bug.
+    # Start from all-gold, then reintroduce exactly one bug. Gold is read from
+    # the vendored source, which stays outside the agent's reach.
     for program in config.PROGRAMS:
-        gold = dest / "correct_python_programs" / f"{program}.py"
+        gold = source / "correct_python_programs" / f"{program}.py"
         if gold.is_file():
             shutil.copy2(gold, dest / "python_programs" / f"{program}.py")
 
@@ -153,11 +163,15 @@ def build(case: dict, dest: Path, source: Path | None = None) -> Workspace:
     return Workspace(root=dest, case_id=case["case_id"], baseline=_snapshot(dest))
 
 
-def apply_gold_patch(ws: Workspace, program: str) -> None:
+def apply_gold_patch(ws: Workspace, program: str, source: Path | None = None) -> None:
     """Overwrite the buggy program with its gold version.
+
+    Reads gold from the vendored source rather than from the workspace, because
+    the workspace deliberately does not contain it -- see `build`.
 
     This is the harness's self-test: gold must score a perfect net-resolved run.
     If it does not, the metric is wrong and nothing downstream can be believed.
     """
-    gold = ws.root / "correct_python_programs" / f"{program}.py"
+    source = source or config.QUIXBUGS_DIR
+    gold = source / "correct_python_programs" / f"{program}.py"
     shutil.copy2(gold, ws.root / "python_programs" / f"{program}.py")

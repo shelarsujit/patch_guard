@@ -75,7 +75,10 @@ def run(runner: Runner, cases: list[dict], out_path: Path,
     results: list[CaseResult] = []
     for case in cases:
         started = time.time()
-        ws = workspace.build(case, scratch / case["case_id"])
+        # Each case gets its own parent directory so that `..` from inside the
+        # workspace cannot reach a sibling case or the pristine snapshot. An
+        # agent that wanders upward should find nothing useful.
+        ws = workspace.build(case, scratch / case["case_id"] / "repo")
         try:
             report = runner(case, ws)
         except Exception as exc:  # a crashed runner is a result, not an abort

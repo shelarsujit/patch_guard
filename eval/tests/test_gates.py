@@ -215,3 +215,25 @@ def test_summary_rates():
     assert s.net_resolved_rate == pytest.approx(1 / 3), "net-resolved view"
     assert s.regressions_per_patch == pytest.approx(2 / 3)
     assert s.overclaim_rate == pytest.approx(2 / 3), "2 of 3 done-claims were wrong"
+
+
+# --- Evaluation validity ----------------------------------------------------
+
+
+def test_gold_implementations_are_not_visible_to_the_agent(case, ws):
+    """QuixBugs ships correct_python_programs/ next to the buggy code.
+
+    If that directory reached the workspace, either runner could solve every
+    case with a single `cp` and score a perfect run while measuring nothing.
+    The workspace must not contain it -- and the harness must still be able to
+    apply the gold patch from the vendored source.
+    """
+    assert not (ws.root / "correct_python_programs").exists(), \
+        "the gold implementations must never be reachable from the workspace"
+
+    visible = {p.name for p in ws.root.rglob("*.py")}
+    assert f"{case['program']}.py" in visible, "the buggy program is still present"
+
+    workspace.apply_gold_patch(ws, case["program"])
+    assert _score(case, ws, {"done_claim": True}).net_resolved, \
+        "the harness must still be able to apply gold from the vendored source"
