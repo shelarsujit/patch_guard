@@ -14,6 +14,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# The report contains ✅/⚠️ markers, and a Windows console defaults to cp1252,
+# which cannot encode them: printing the document raises UnicodeEncodeError and
+# takes the whole eval step down *after* the sweep has already been paid for.
+# The file itself is written as UTF-8 regardless; this only fixes the echo.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # not a real console; nothing to fix
+        pass
+
 from eval.metric import CaseResult, Summary, load, summarize  # noqa: E402
 from patch_guard import config  # noqa: E402
 
