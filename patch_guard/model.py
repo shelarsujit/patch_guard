@@ -67,6 +67,9 @@ class WorkerModel:
                 messages=messages,
                 temperature=config.TEMPERATURE,
                 max_tokens=config.MAX_OUTPUT_TOKENS,
+                # Without a timeout a dead connection stalls the sweep silently.
+                timeout=config.REQUEST_TIMEOUT,
+                num_retries=config.REQUEST_RETRIES,
                 **({"extra_body": routing} if (routing := config.provider_routing(self.model)) else {}),
             )
         except Exception as exc:

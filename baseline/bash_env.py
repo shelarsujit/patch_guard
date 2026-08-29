@@ -45,6 +45,35 @@ def find_bash() -> str | None:
     return None
 
 
+def _process_group_kwargs() -> dict:
+    """Spawn the shell as its own process group so the tree can be killed.
+
+    Without this the timeout path can only reach bash itself, and anything bash
+    started outlives it.
+    """
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill the shell and every process it spawned."""
+    if os.name == "nt":
+        # taskkill /T walks the child tree; Popen.kill() alone would not.
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                       capture_output=True, check=False)
+    else:
+        import signal
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
+
+
 def _venv_bin() -> str:
     d = REPO_ROOT / ".venv" / ("Scripts" if os.name == "nt" else "bin")
     return str(d) if d.is_dir() else ""
@@ -72,22 +101,39 @@ class BashEnvironment(LocalEnvironment):
             env["PATH"] = bin_dir + os.pathsep + env.get("PATH", "")
         env["PYTHONDONTWRITEBYTECODE"] = "1"
 
+        limit = timeout or self.config.timeout
         try:
-            proc = subprocess.run(
+            # Popen + explicit tree kill, not subprocess.run(timeout=...).
+            #
+            # run() kills only the direct child -- bash. The `python -m pytest`
+            # grandchild survives, keeps the inherited stdout pipe open, and
+            # run() then blocks forever waiting for an EOF that never comes.
+            # QuixBugs bugs include real infinite loops (bitcount is `n ^= n-1`),
+            # so the agent reliably produces exactly this situation, and a whole
+            # recording sweep wedged on it for 28 minutes looking like progress.
+            proc = subprocess.Popen(
                 [self.bash, "-c", command],
                 cwd=cwd, env=env, text=True, encoding="utf-8", errors="replace",
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                timeout=timeout or self.config.timeout,
+                **_process_group_kwargs(),
             )
-            output = {"output": proc.stdout, "returncode": proc.returncode, "exception_info": ""}
-        except subprocess.TimeoutExpired as exc:
-            raw = exc.output or ""
-            output = {
-                "output": raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw,
-                "returncode": -1,
-                "exception_info": f"command timed out after {timeout or self.config.timeout}s",
-                "extra": {"exception_type": "TimeoutExpired", "exception": str(exc)},
-            }
+            try:
+                stdout, _ = proc.communicate(timeout=limit)
+                output = {"output": stdout, "returncode": proc.returncode, "exception_info": ""}
+            except subprocess.TimeoutExpired:
+                _kill_tree(proc)
+                # The tree is gone, so this drains what was buffered and returns
+                # rather than blocking on a pipe an orphan is still holding.
+                try:
+                    stdout, _ = proc.communicate(timeout=10)
+                except subprocess.TimeoutExpired:
+                    stdout = ""
+                output = {
+                    "output": stdout or "",
+                    "returncode": -1,
+                    "exception_info": f"command timed out after {limit}s",
+                    "extra": {"exception_type": "TimeoutExpired"},
+                }
         except Exception as exc:  # noqa: BLE001 - surfaced to the agent, not raised
             output = {
                 "output": "", "returncode": -1,

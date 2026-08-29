@@ -133,6 +133,23 @@ OPENROUTER_PROVIDERS = ["DeepInfra", "CoreWeave", "Parasail"]
 # leaves the same-model property intact.
 REASONING_EFFORT = "low"
 
+# Seconds before a single provider call is abandoned.
+#
+# Not a tuning knob -- a liveness guarantee. Without it litellm will wait on a
+# dead connection indefinitely, and a recording sweep that stalls looks exactly
+# like a recording sweep that is working: no error, no output, no progress. One
+# run sat wedged for 28 minutes on a single request before it was noticed.
+# Every other slow path in this project is already wall-clocked (pytest calls,
+# the agent's own shell commands); the LLM call was the last one that was not.
+#
+# Generous relative to observed latency, which is a few seconds per call: this
+# should only ever fire on a genuinely broken connection, never on a slow one.
+REQUEST_TIMEOUT = 120
+
+# Provider-side retries for a timed-out or transient call. litellm retries
+# internally; this bounds how long that can go on.
+REQUEST_RETRIES = 2
+
 
 def provider_routing(model: str | None = None) -> dict | None:
     """OpenRouter request extras for `model`, or None for other providers.

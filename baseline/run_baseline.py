@@ -114,7 +114,11 @@ class BaselineRunner:
         # Native tool calling, with upstream's FormatError path used to absorb
         # Groq's occasional malformed-tool-call rejection. See resilient_model.py.
         model_kwargs = {"temperature": config.TEMPERATURE,
-                        "max_tokens": config.MAX_OUTPUT_TOKENS}
+                        "max_tokens": config.MAX_OUTPUT_TOKENS,
+                        # A sweep with no request timeout stalls silently on a
+                        # dead connection -- indistinguishable from working.
+                        "timeout": config.REQUEST_TIMEOUT,
+                        "num_retries": config.REQUEST_RETRIES}
         # Pin the OpenRouter backend. Unpinned, some backends return the model's
         # reasoning with an empty final channel and no tool call, which scores as
         # the agent failing to act. See config.OPENROUTER_PROVIDERS.
