@@ -22,14 +22,29 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+# Artifacts produced by running the tests, not by the agent. Counting these as
+# changes would put a .pytest_cache directory in every recorded patch and make
+# "the workspace is clean" impossible to assert after a rollback.
+_IGNORED_PARTS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
+
+
+def _is_artifact(rel: str) -> bool:
+    parts = rel.split("/")
+    return (
+        any(part in _IGNORED_PARTS for part in parts)
+        or rel.endswith(".pyc")
+        or parts[-1].startswith("_patchguard")
+    )
+
+
 def _snapshot(root: Path) -> dict[str, str]:
-    """Hash every tracked file so any modification is detectable later."""
+    """Hash every agent-visible file so any modification is detectable later."""
     out: dict[str, str] = {}
     for p in sorted(root.rglob("*")):
         if not p.is_file():
             continue
         rel = p.relative_to(root).as_posix()
-        if rel.startswith("_") or "__pycache__" in rel or rel.endswith(".pyc"):
+        if _is_artifact(rel):
             continue
         out[rel] = _sha256(p)
     return out

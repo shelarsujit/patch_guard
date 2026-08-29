@@ -52,6 +52,10 @@ def _pytest(workdir: Path, targets: list[str], timeout: int) -> tuple[dict, bool
                 "-q", "--tb=no",
                 # Ignore any pytest config the agent may have dropped in.
                 "-o", "addopts=",
+                # Keep the workspace free of test-run artifacts: a stray
+                # .pytest_cache/ would otherwise show up as agent-added files
+                # in the diff and defeat the post-rollback cleanliness check.
+                "-p", "no:cacheprovider",
             ],
             cwd=workdir, env=env, capture_output=True, text=True, timeout=timeout,
         )
