@@ -150,6 +150,12 @@ Reproduced from committed cassettes, offline, at $0.
 conventional leaderboard would publish; the gap between the two rows is the
 thing this project exists to measure.
 
+> **On the wall-clock row.** It measures runner time only. The supervisor runs
+> its gates *inside* the run, so its figure includes the full cost of guarding;
+> the baseline has no gates, and the scoring passes that grade it afterwards are
+> excluded from its figure. The comparison is therefore biased **against**
+> Patch-Guard, which is the safe direction for a claim like this one.
+
 ## Done-claim versus ground truth
 
 {hot_take(results)}
