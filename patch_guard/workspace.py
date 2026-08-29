@@ -12,6 +12,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -121,6 +122,38 @@ class Workspace:
         target.write_text(text, encoding="utf-8", newline="\n")
 
 
+def _clear_dest(dest: Path, attempts: int = 5) -> Path:
+    """Return an empty directory at `dest`, or beside it if `dest` is locked.
+
+    Windows refuses to remove a directory while any process holds a handle
+    inside it, and the agent's own commands are a reliable source of such
+    processes: a QuixBugs infinite loop that outlives its shell keeps its
+    working directory locked. One such orphan aborted a recording sweep four
+    cases in, with every completed case still unwritten.
+
+    Retrying handles the common transient case (a virus scanner or indexer
+    holding a handle for a moment). If the lock persists, building beside the
+    locked path is strictly better than losing the run: the workspace is
+    disposable and its location is not load-bearing, whereas the sweep is paid
+    for in tokens and wall-clock.
+    """
+    for attempt in range(attempts):
+        if not dest.exists():
+            return dest
+        try:
+            shutil.rmtree(dest)
+            return dest
+        except (PermissionError, OSError):
+            if attempt < attempts - 1:
+                time.sleep(0.5 * (attempt + 1))
+
+    for suffix in range(1, 100):
+        alt = dest.with_name(f"{dest.name}__{suffix}")
+        if not alt.exists():
+            return alt
+    raise RuntimeError(f"could not obtain a clean workspace at {dest}")
+
+
 def build(case: dict, dest: Path, source: Path | None = None) -> Workspace:
     """Materialize `case`'s workspace at `dest` and take its pristine snapshot.
 
@@ -132,8 +165,7 @@ def build(case: dict, dest: Path, source: Path | None = None) -> Workspace:
     it (see `apply_gold_patch`); the agent never sees it.
     """
     source = source or config.QUIXBUGS_DIR
-    if dest.exists():
-        shutil.rmtree(dest)
+    dest = _clear_dest(dest)
     shutil.copytree(source, dest, ignore=shutil.ignore_patterns(
         "correct_python_programs", "PROVENANCE.json", "__pycache__"))
 
