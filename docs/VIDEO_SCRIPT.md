@@ -1,7 +1,12 @@
 # Patch-Guard — 5-minute video script
 
+> **This file is a planning draft, not the shipped narration.** The video is
+> generated, not recorded: `video/sections.py` holds the narration that is
+> actually spoken and is the authoritative text. Edit that file and rebuild with
+> `python -m video.build_video`. This draft is kept because it shows the shape
+> the talk was planned in, and it will drift from the delivered script.
+
 Target 4:45. Numbers in **bold** must match `results/report.md` at record time.
-Re-check them immediately before recording; do not read from this file blind.
 
 ---
 

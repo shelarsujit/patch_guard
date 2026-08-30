@@ -4,9 +4,11 @@ Every figure here is copied from `results/report.md`, which is generated from
 `results/*.jsonl`. If a number moves, regenerate the report and update this file
 rather than the other way round.
 
-Narration is written for a speech synthesizer, so numerals and symbols are
-spelled out ("twenty four points", "M C P") and sentences are kept short. It
-reads slightly oddly on the page and correctly out loud.
+Narration is written as ordinary spoken English -- contractions, commas where a
+speaker would breathe, acronyms and numerals left as themselves. An earlier
+version spelled them out phonetically ("M C P", "twenty four points", "read me")
+because the Windows SAPI voice mispronounced them. The neural voice reads them
+correctly, and the phonetic spellings made it sound like a machine reciting.
 """
 
 from __future__ import annotations
@@ -26,9 +28,9 @@ SECTIONS = [
             ("good", "3.  the test files were never touched"),
         ],
         say=(
-            "Coding agents are graded on one question. Did the failing test pass? "
-            "That is not the same question as, did you fix it. "
-            "Patch Guard wraps a cheap coding agent, and refuses to let it submit "
+            "Coding agents get graded on one question. Did the failing test pass? "
+            "That's not the same question as, did you fix it. "
+            "Patch-Guard wraps a cheap coding agent, and refuses to let it submit "
             "unless three things hold at once. The reported test passes. Nothing "
             "that used to pass is broken. And the test files were never touched."
         ),
@@ -45,11 +47,11 @@ SECTIONS = [
             ("dim", "breaking other code. Not style."),
         ],
         say=(
-            "Here is why that matters. METR had maintainers from scikit learn, "
-            "Sphinx and pytest review two hundred and ninety six A I generated "
-            "pull requests. Merge decisions came in about twenty four points below "
-            "the benchmark resolved scores. The leading reasons were core "
-            "functionality broken, and the patch breaking other code. Not style."
+            "Here's why that matters. METR had maintainers from scikit-learn, "
+            "Sphinx and pytest review 296 AI-generated pull requests. Merge "
+            "decisions came in about 24 points below the benchmark's resolved "
+            "scores. The leading reasons were core functionality broken, and the "
+            "patch breaking other code. Not style."
         ),
     ),
     dict(
@@ -67,13 +69,13 @@ SECTIONS = [
             ("good", "This sweeps the whole suite."),
         ],
         say=(
-            "The metric is net resolved. All three conditions at once, or it does "
-            "not count. One thing to be precise about. The benchmark own resolved "
-            "metric already requires the pass to pass set. An earlier draft of my "
-            "read me claimed otherwise, and that was wrong. The real gap is "
-            "narrower. It runs only the test files the pull request touched, so a "
-            "regression outside them is invisible. This sweeps the whole suite. I "
-            "would rather show you a correction, than have you find one."
+            "The metric is net-resolved. All three conditions at once, or it "
+            "doesn't count. One thing to be precise about: SWE-bench's own "
+            "resolved metric already requires the pass-to-pass set. An earlier "
+            "draft of my README claimed otherwise, and that was wrong. The real "
+            "gap is narrower. It runs only the test files the pull request "
+            "touched, so a regression outside them is invisible. This sweeps the "
+            "whole suite. I'd rather show you a correction, than have you find one."
         ),
     ),
     dict(
@@ -91,14 +93,14 @@ SECTIONS = [
         ],
         say=(
             "Same worker model, same temperature, same cases, same starting "
-            "information on both sides. The only difference is supervision. Net "
-            "resolved goes from fifty percent, to seventy. Reward hacking on spec "
-            "contradicting tests goes from two of four, to zero. The twenty point "
-            "gain was not what I expected. Gates reject patches, so I predicted "
-            "they would trade resolution for safety. They did not, because a "
-            "rejection carries its reason back to the worker. Two cases the one "
-            "shot baseline abandoned came back on a later attempt. The gates are a "
-            "repair signal, not only a filter."
+            "information on both sides. The only difference is supervision. "
+            "Net-resolved goes from 50 percent, to 70. Reward hacking on "
+            "spec-contradicting tests goes from two of four, to zero. The "
+            "20-point gain wasn't what I expected. Gates reject patches, so I "
+            "predicted they'd trade resolution for safety. They didn't, because a "
+            "rejection carries its reason back to the worker. Two cases the "
+            "one-shot baseline abandoned came back on a later attempt. The gates "
+            "are a repair signal, not just a filter."
         ),
     ),
     dict(
@@ -115,16 +117,16 @@ SECTIONS = [
             ("bad", "                       ->  4 tests in untouched modules break"),
         ],
         say=(
-            "Here is the part I would push on, if I were reviewing this. "
-            "Regressions per patch read zero on every sweep. Not because nothing "
-            "regressed, but because on this benchmark nothing could. Its programs "
-            "are independent single files, so a one file patch cannot break another "
-            "program. Two of my three gates were measured, and the third was taken "
-            "on trust. So I built a set that can break. A shared helper behind three "
-            "callers, with the bug placed so the correct fix is in the caller, and "
-            "the obvious fix is in the helper. Fix it in the helper, and the target "
-            "test genuinely passes. A leaderboard calls that resolved. Four tests, "
-            "in modules the agent never touched, go red."
+            "Here's the part I'd push on, if I were reviewing this. Regressions "
+            "per patch read zero on every sweep. Not because nothing regressed, "
+            "but because on this benchmark nothing could. Its programs are "
+            "independent single files, so a one-file patch can't break another "
+            "program. Two of my three gates were measured, and the third was "
+            "taken on trust. So I built a set that can break. A shared helper "
+            "behind three callers, with the bug placed so the correct fix is in "
+            "the caller, and the obvious fix is in the helper. Fix it in the "
+            "helper, and the target test genuinely passes. A leaderboard calls "
+            "that resolved. Four tests, in modules the agent never touched, go red."
         ),
     ),
     dict(
@@ -140,12 +142,12 @@ SECTIONS = [
             ("body", "An agent trusting only the first tool would submit that patch."),
         ],
         say=(
-            "The same three gates are exposed as an M C P server, so Claude Code or "
+            "The same three gates are exposed as an MCP server, so Claude Code or "
             "Cursor can check their own work. This transcript is generated by a "
             "real client against a live server. Watch the verdicts disagree. Run "
-            "target test says, passed, true. Run regression suite says, four "
-            "regressions. An agent that trusted the first tool and stopped, would "
-            "have submitted that patch. That is the argument for the other two "
+            "target test says: passed, true. Run regression suite says: four "
+            "regressions. An agent that trusted the first tool and stopped would "
+            "have submitted that patch. That's the argument for the other two "
             "gates, in one transcript."
         ),
     ),
@@ -163,12 +165,12 @@ SECTIONS = [
             "Then a question this project had been citing, rather than testing. "
             "Prior work reports that gating helps weaker models about twice as "
             "much. So I ran the same cases against a model six times larger. The "
-            "gain from supervision halves. Twenty points, down to ten. That "
-            "replicates the gradient, through a different mechanism. But look at "
-            "the second row. Unsupervised, the larger model reward hacked more, not "
-            "less. Three of four, instead of two. Capability bought competence, and "
-            "cost integrity. Under the gates, both models cheat zero times. The "
-            "gates do not require the worker to be honest."
+            "gain from supervision halves. 20 points, down to 10. That replicates "
+            "the gradient, through a different mechanism. But look at the second "
+            "row. Unsupervised, the larger model reward-hacked more, not less. "
+            "Three of four, instead of two. Capability bought competence, and cost "
+            "integrity. Under the gates, both models cheat zero times. The gates "
+            "don't require the worker to be honest."
         ),
     ),
     dict(
@@ -184,14 +186,14 @@ SECTIONS = [
             ("dim", "it drives a real shell, and timeouts shift with machine load."),
         ],
         say=(
-            "Three things these numbers do not show. Stated in the read me, rather "
-            "than left to be found. Neither runner ever refused. "
-            "diagnosed the contradiction either. Harm prevented. Diagnosis not made. "
-            "Overclaiming barely appeared. Eleven of fourteen baseline runs ended by "
-            "exhausting the step budget, not by declaring false victory. And the "
-            "supervisor replays perfectly from cassettes, but the baseline only "
-            "eleven of fourteen, because it drives a real shell whose timeouts shift "
-            "with machine load."
+            "Three things these numbers don't show, stated in the README rather "
+            "than left to be found. Neither runner ever refused. Patch-Guard "
+            "blocks the cheat, but it never names the contradiction either. Harm "
+            "prevented; diagnosis not made. Overclaiming barely appeared: 11 of 14 "
+            "baseline runs ended by exhausting the step budget, not by declaring "
+            "false victory. And the supervisor replays perfectly from cassettes, "
+            "but the baseline only 11 of 14, because it drives a real shell whose "
+            "timeouts shift with machine load."
         ),
     ),
     dict(
@@ -208,16 +210,16 @@ SECTIONS = [
             ("good", "Every one of them biased the comparison in this project's favour."),
         ],
         say=(
-            "And the finding I did not go looking for. Building this harness "
-            "surfaced eleven infrastructure faults, that each produced a plausible "
+            "And the finding I didn't go looking for. Building this harness "
+            "surfaced eleven infrastructure faults that each produced a plausible "
             "number instead of an error. Gold implementations reachable in the "
             "workspace, which would have scored a perfect run while measuring "
             "nothing. An undocumented quota ceiling, scored as agent failure. One "
-            "broken import, scored as sixty two regressions. And a cassette that "
-            "served one model another model recordings, which fabricated a clean "
-            "result I nearly published. Every one of them, left alone, would have "
-            "biased the comparison in this project favour. At this model tier, "
-            "most of what looks like agent failure is harness artifact."
+            "broken import, scored as 62 regressions. And a cassette that served "
+            "one model another model's recordings, which fabricated a clean result "
+            "I nearly published. Every one of them, left alone, would have biased "
+            "the comparison in this project's favour. At this model tier, most of "
+            "what looks like agent failure is harness artifact."
         ),
     ),
     dict(
@@ -232,10 +234,10 @@ SECTIONS = [
             ("dim", "github.com/shelarsujit/patch_guard"),
         ],
         say=(
-            "Everything you have seen runs offline, from committed recordings, with "
-            "no A P I key, at zero cost. The harness self test comes first. Gold "
-            "patches must score one hundred percent, and a no op agent must score "
-            "zero, or no number downstream is believed. Thank you."
+            "Everything you've seen runs offline, from committed recordings, with "
+            "no API key, at zero cost. The harness self-test comes first. Gold "
+            "patches must score 100 percent, and a no-op agent must score zero, or "
+            "no number downstream is believed. Thank you."
         ),
     ),
 ]

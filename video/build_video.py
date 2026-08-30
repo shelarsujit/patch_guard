@@ -1,7 +1,7 @@
 """Render the submission video: slides + synthesized narration, no manual editing.
 
 Everything here is generated from the repository's own committed numbers. Slides
-are drawn with Pillow, narration is synthesized with the Windows SAPI voice, and
+are drawn with Pillow, narration is synthesized with a neural TTS voice, and
 ffmpeg muxes one still per section against its audio and concatenates the lot.
 
     python video/build_video.py
@@ -91,19 +91,40 @@ def slide(path: Path, title: str, lines: list[tuple[str, str]], footer: str = ""
 # --- narration --------------------------------------------------------------
 
 
+VOICE = "en-US-AndrewMultilingualNeural"
+RATE = "+8%"
+# Held after the narration ends, so the closing word is not clipped by the
+# exact `-t` cut and the slide does not vanish the instant speech stops.
+TAIL = 0.4
+
+
 def narrate(path: Path, text: str) -> None:
-    """Synthesize with the Windows SAPI voice (offline, no service)."""
-    ps = (
-        "Add-Type -AssemblyName System.Speech; "
-        "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
-        "$s.SelectVoice('Microsoft Zira Desktop'); "
-        "$s.Rate = 2; "
-        f"$s.SetOutputToWaveFile('{path}'); "
-        f"$s.Speak(@'\n{text}\n'@); "
-        "$s.Dispose()"
-    )
-    subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                   check=True, capture_output=True)
+    """Synthesize one section with a neural TTS voice.
+
+    The first version used the Windows SAPI voice, which is offline but
+    concatenative: it lands every sentence on the same flat contour and reads
+    like a machine. `edge-tts` reaches Microsoft's neural voices, which carry
+    prosody across a clause, so the narration sounds spoken rather than
+    recited. It needs a network connection at build time -- acceptable, because
+    the rendered mp4 is committed and nobody has to rebuild it to watch it.
+
+    A slight rate lift keeps a five-minute budget without the clipped delivery
+    that a large one produces.
+    """
+    script = path.with_suffix(".txt")
+    script.write_text(text, encoding="utf-8")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "edge_tts", "--voice", VOICE, f"--rate={RATE}",
+             "--file", str(script), "--write-media", str(path)],
+            check=True, capture_output=True, timeout=180)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise SystemExit(
+            f"neural narration failed for {path.name}: {exc}\n"
+            "edge-tts needs a network connection. `pip install edge-tts`, then retry."
+        ) from exc
+    if not path.is_file() or path.stat().st_size == 0:
+        raise SystemExit(f"neural narration produced no audio for {path.name}")
 
 
 def duration(path: Path) -> float:
@@ -114,14 +135,21 @@ def duration(path: Path) -> float:
     return float(out.stdout.strip())
 
 
-def segment(index: int, png: Path, wav: Path) -> Path:
-    """One still image held for exactly the length of its narration."""
+def segment(index: int, png: Path, audio: Path, secs: float) -> Path:
+    """One still image held for exactly the length of its narration.
+
+    The duration is pinned with `-t` rather than left to `-shortest`. With
+    `-shortest` the video stream runs on to the next keyframe and the mp3
+    decoder contributes its own padding, so every segment overran by around two
+    seconds -- invisible per segment, but nineteen seconds across ten of them,
+    which pushed a 4:47 script out to a 5:06 file and over the limit.
+    """
     mp4 = BUILD / f"seg{index:02d}.mp4"
     subprocess.run(
-        [FFMPEG, "-y", "-loop", "1", "-i", str(png), "-i", str(wav),
+        [FFMPEG, "-y", "-loop", "1", "-i", str(png), "-i", str(audio),
          "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-b:a", "192k", "-shortest",
-         "-vf", "fps=30", str(mp4)],
+         "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+         "-t", f"{secs + TAIL:.3f}", "-vf", "fps=30", str(mp4)],
         check=True, capture_output=True)
     return mp4
 
@@ -138,13 +166,13 @@ def main() -> None:
 
     for i, s in enumerate(SECTIONS):
         png = BUILD / f"slide{i:02d}.png"
-        wav = BUILD / f"say{i:02d}.wav"
+        mp3 = BUILD / f"say{i:02d}.mp3"
         slide(png, s["title"], s["lines"], s.get("footer", ""))
-        narrate(wav, s["say"])
-        secs = duration(wav)
-        total += secs
+        narrate(mp3, s["say"])
+        secs = duration(mp3)
+        total += secs + TAIL
         print(f"  {i:02d}  {secs:5.1f}s  " + s["title"][:58])
-        segments.append(segment(i, png, wav))
+        segments.append(segment(i, png, mp3, secs))
 
     listing = BUILD / "concat.txt"
     listing.write_text("".join("file " + repr(p.as_posix()) + chr(10) for p in segments),
