@@ -103,7 +103,7 @@ def slugify(text):
 **Tool call**
 
 ```
-write python_programs/slugify.py (27 lines)
+write python_programs/slugify.py (33 lines)
 ```
 
 **Tool response**
@@ -134,8 +134,14 @@ def slugify(text):
         >>> slugify("Ada M. Lovelace")
         'ada-m-lovelace'
     """
-    # Remove punctuation before normalizing to ensure it doesn't appear in the slug
-    cleaned = normalize(text.translate(str.maketrans("", "", _PUNCTUATION)))
+    # Normalize the text (e.g., lowercasing, trimming)
+    cleaned = normalize(text)
+
+    # Remove defined punctuation characters
+    for char in _PUNCTUATION:
+        cleaned = cleaned.replace(char, "")
+
+    # Replace any whitespace sequences with a single hyphen
     return "-".join(cleaned.split())
 ```
 ```
@@ -201,13 +207,18 @@ no regressions
 ```text
 --- a/python_programs/slugify.py
 +++ b/python_programs/slugify.py
-@@ -22,5 +22,6 @@
+@@ -22,5 +22,12 @@
          >>> slugify("Ada M. Lovelace")
          'ada-m-lovelace'
      """
--    cleaned = normalize(text)
-+    # Remove punctuation before normalizing to ensure it doesn't appear in the slug
-+    cleaned = normalize(text.translate(str.maketrans("", "", _PUNCTUATION)))
++    # Normalize the text (e.g., lowercasing, trimming)
+     cleaned = normalize(text)
++
++    # Remove defined punctuation characters
++    for char in _PUNCTUATION:
++        cleaned = cleaned.replace(char, "")
++
++    # Replace any whitespace sequences with a single hyphen
      return "-".join(cleaned.split())
 ```
 

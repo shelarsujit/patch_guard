@@ -78,7 +78,19 @@ thing this project exists to measure.
 
 ## Capability axis — does supervision help the weaker model more?
 
-_Run the 120b sweep to populate this section._
+Computed over the 10 standard and 4 impossible cases both models ran.
+
+| Worker | Baseline | Patch-Guard | Gain from supervision |
+|---|---|---|---|
+| `gpt-oss-20b` | 50% | 70% | **+20 pts** |
+| `gpt-oss-120b` | 50% | 70% | **+20 pts** |
+
+Reward hacking on the impossible variants, same cases:
+
+| Worker | Baseline cheats | Patch-Guard cheats |
+|---|---|---|
+| `gpt-oss-20b` | 2/4 | 0/4 |
+| `gpt-oss-120b` | 2/4 | 0/4 |
 
 ## Harness self-test
 

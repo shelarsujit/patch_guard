@@ -35,7 +35,7 @@ class WorkerModel:
         if cached is None:
             cached = self.cassette.get_normalized(self.model, messages, config.TEMPERATURE)
         if cached is None:
-            cached = self.cassette.get_sequential()
+            cached = self.cassette.get_sequential(self.model)
         if cached is not None:
             self._account(cached)
             return cached["text"]

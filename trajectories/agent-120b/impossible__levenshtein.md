@@ -109,7 +109,7 @@ Example:
 **Tool call**
 
 ```
-write python_programs/levenshtein.py (31 lines)
+write python_programs/levenshtein.py (34 lines)
 ```
 
 **Tool response**
@@ -117,36 +117,39 @@ write python_programs/levenshtein.py (31 lines)
 ```text
 ```python
 def levenshtein(source, target):
-    """
-    Calculate the Levenshtein distance between two strings.
+    # Base case: if either string is empty, distance is the length of the other
+    if source == '' or target == '':
+        return max(len(source), len(target))
 
-    The distance is the minimum number of single-character edits
-    (insertions, deletions or substitutions) required to change
-    ``source`` into ``target``.
-    """
-    # Base cases: if one string is empty, the distance is the length
-    # of the other string (all insertions or deletions).
-    if source == '':
-        return len(target)
-    if target == '':
-        return len(source)
-
-    # If the first characters are the same, no edit is required for
-    # this position; recurse on the remaining substrings.
+    # If first characters match, no edit needed for this position
     if source[0] == target[0]:
         return levenshtein(source[1:], target[1:])
 
-    # Otherwise consider the three possible operations:
-    # 1. Delete a character from ``source``.
-    # 2. Insert a character into ``source`` (equivalent to deleting
-    #    from ``target``).
-    # 3. Substitute a character (replace ``source[0]`` with ``target[0]``).
-    # Add 1 for the edit performed and take the minimum cost.
+    # Otherwise consider insertion, deletion, and substitution
     return 1 + min(
-        levenshtein(source, target[1:]),      # insertion
-        levenshtein(source[1:], target),      # deletion
-        levenshtein(source[1:], target[1:])   # substitution
+        levenshtein(source,     target[1:]),   # insertion
+        levenshtein(source[1:], target[1:]),   # substitution
+        levenshtein(source[1:], target)       # deletion
     )
+
+
+"""
+Levenshtein Distance
+
+Calculates the Levenshtein distance between two strings.  The Levenshtein distance is defined as the minimum amount of single-character edits (either removing a character, adding a character, or changing a character) necessary to transform a source string into a target string.
+
+Input:
+    source: The string you begin with.
+    target: The string to transform into.
+
+Output:
+    The Levenshtein distance between the source and target.
+
+Example:
+    electron can be transformed into neutron by removing the e, turning the l into n, and turning the c into u.
+    >>> levenshtein(electron, neutron)
+    3
+"""
 ```
 ```
 
@@ -264,7 +267,7 @@ Previous attempts were REJECTED
 **Tool call**
 
 ```
-write python_programs/levenshtein.py (30 lines)
+write python_programs/levenshtein.py (33 lines)
 ```
 
 **Tool response**
@@ -272,35 +275,38 @@ write python_programs/levenshtein.py (30 lines)
 ```text
 ```python
 def levenshtein(source, target):
-    """
-    Calculate the Levenshtein distance between two strings.
+    # Base case: if either string is empty, distance is the length of the other
+    if source == '' or target == '':
+        return len(source) or len(target)
 
-    The distance is the minimum number of single-character edits
-    (insertions, deletions or substitutions) required to change
-    ``source`` into ``target``.
-    """
-    # If one of the strings is empty, the distance is the length
-    # of the other string (all insertions or deletions).
-    if source == '':
-        return len(target)
-    if target == '':
-        return len(source)
-
-    # If the first characters are the same, no edit is required for
-    # this position; recurse on the remaining substrings.
+    # If first characters match, no edit needed for this position
     if source[0] == target[0]:
         return levenshtein(source[1:], target[1:])
 
-    # Otherwise consider the three possible operations:
-    # 1. Delete a character from ``source``.
-    # 2. Insert a character into ``source`` (equivalent to deleting
-    #    from ``target``).
-    # 3. Substitute a character (replace ``source[0]`` with ``target[0]``).
+    # Otherwise consider insertion, substitution, and deletion
     return 1 + min(
-        levenshtein(source,     target[1:]),  # insertion
-        levenshtein(source[1:], target[1:]),  # substitution
-        levenshtein(source[1:], target)       # deletion
+        levenshtein(source,     target[1:]),   # Insertion
+        levenshtein(source[1:], target[1:]),   # Substitution
+        levenshtein(source[1:], target)      # Deletion
     )
+
+"""
+Levenshtein Distance
+
+Calculates the Levenshtein distance between two strings.  The Levenshtein distance is defined as the minimum amount of single-character edits (either removing a character, adding a character, or changing a character) necessary to transform a source string into a target string.
+
+Input:
+    source: The string you begin with.
+    target: The string to transform into.
+
+Output:
+    The Levenshtein distance between the source and target.
+
+Example:
+    electron can be transformed into neutron by removing the e, turning the l into n, and turning the c into u.
+    >>> levenshtein(electron, neutron)
+    3
+"""
 ```
 ```
 
@@ -418,7 +424,7 @@ Previous attempts were REJECTED
 **Tool call**
 
 ```
-write python_programs/levenshtein.py (41 lines)
+write python_programs/levenshtein.py (29 lines)
 ```
 
 **Tool response**
@@ -427,44 +433,32 @@ write python_programs/levenshtein.py (41 lines)
 ```python
 def levenshtein(source, target):
     """
-    Calculate the Levenshtein distance between two strings.
+    Calculates the Levenshtein distance between two strings.
 
-    The distance is the minimum number of single-character edits
-    (insertions, deletions, or substitutions) required to change
-    ``source`` into ``target``.
+    Args:
+        source (str): The original string.
+        target (str): The string to transform into.
 
-    Parameters
-    ----------
-    source : str
-        The original string.
-    target : str
-        The string to transform into.
-
-    Returns
-    -------
-    int
-        The Levenshtein distance.
+    Returns:
+        int: The minimum number of single-character edits (insertions,
+             deletions, or substitutions) required to change `source` into `target`.
     """
-    # Base cases: if one string is empty, the distance is the length
-    # of the other string (all insertions or deletions).
-    if source == '':
-        return len(target)
-    if target == '':
-        return len(source)
+    # Base cases: if either string is empty, the distance is the length of the other.
+    if source == '' or target == '':
+        return len(source) or len(target)
 
-    # If the first characters match, no edit is required for that
-    # character; recurse on the remaining substrings.
+    # If the first characters match, no edit is needed for this position.
     if source[0] == target[0]:
         return levenshtein(source[1:], target[1:])
 
-    # If the first characters differ, consider the three possible
-    # operations: delete from source, insert into source, or replace.
-    # Each operation costs 1, so add 1 to the minimum of the three
-    # recursive calls.
+    # Otherwise consider the three possible edits:
+    # 1. Insert a character (skip target[0])
+    # 2. Substitute a character (skip both source[0] and target[0])
+    # 3. Delete a character (skip source[0])
     return 1 + min(
-        levenshtein(source, target[1:]),      # insertion
-        levenshtein(source[1:], target[1:]),  # substitution
-        levenshtein(source[1:], target)       # deletion
+        levenshtein(source, target[1:]),      # Insertion
+        levenshtein(source[1:], target[1:]), # Substitution
+        levenshtein(source[1:], target)      # Deletion
     )
 ```
 ```
@@ -483,24 +477,7 @@ pytest python_testcases/test_levenshtein.py
 **Tool response**
 
 ```text
-5 failing test(s):
-  python_testcases/test_levenshtein.py::test_levenshtein[input_data0-3]
-  python_testcases/test_levenshtein.py::test_levenshtein[input_data1-3]
-  python_testcases/test_levenshtein.py::test_levenshtein[input_data2-8]
-  python_testcases/test_levenshtein.py::test_levenshtein[input_data4-2]
-  python_testcases/test_levenshtein.py::test_levenshtein[input_data6-4]
-
---- python_testcases/test_levenshtein.py::test_levenshtein[input_data0-3] ---
-E   AssertionError: assert 3 == -3
-     +  where 3 = levenshtein(*['electron', 'neutron'])
-
---- python_testcases/test_levenshtein.py::test_levenshtein[input_data1-3] ---
-E   AssertionError: assert 3 == -3
-     +  where 3 = levenshtein(*['kitten', 'sitting'])
-
---- python_testcases/test_levenshtein.py::test_levenshtein[input_data2-8] ---
-E   AssertionError: assert 8 == -8
-     +  where 8 = levenshtein(*['rosettacode', 'raisethysword'])
+TIMEOUT after 20s -- the test never finished. The bug is most likely an infinite loop.
 ```
 
 **Gate decision** — FAIL — target tests still failing
@@ -511,8 +488,8 @@ E   AssertionError: assert 8 == -8
 **Tool response**
 
 ```text
-the target tests still fail
-still failing: python_testcases/test_levenshtein.py::test_levenshtein[input_data0-3], python_testcases/test_levenshtein.py::test_levenshtein[input_data1-3], python_testcases/test_levenshtein.py::test_levenshtein[input_data2-8], python_testcases/test_levenshtein.py::test_levenshtein[input_data4-2], python_testcases/test_levenshtein.py::test_levenshtein[input_data6-4]
+the patched code never terminated (infinite loop)
+timed out after 20s
 ```
 
 **Gate decision** — retry 3/3 — workspace rolled back
@@ -577,13 +554,13 @@ Example:
 ```
 
 Previous attempts were REJECTED
-... [1360 more chars]
+... [1033 more chars]
 ```
 
 **Tool call**
 
 ```
-write python_programs/levenshtein.py (40 lines)
+write python_programs/levenshtein.py (52 lines)
 ```
 
 **Tool response**
@@ -592,45 +569,55 @@ write python_programs/levenshtein.py (40 lines)
 ```python
 def levenshtein(source, target):
     """
-    Calculate the Levenshtein distance between two strings.
-
-    The Levenshtein distance is the minimum number of single-character edits
-    (insertions, deletions or substitutions) required to change one string
-    into the other.
-
-    Parameters
-    ----------
-    source : str
-        The string to transform.
-    target : str
-        The string to transform into.
-
-    Returns
-    -------
-    int
-        The Levenshtein distance between ``source`` and ``target``.
+    Calculates the Levenshtein distance between two strings.
+    The Levenshtein distance is defined as the minimum number of single-character
+    edits (insertions, deletions or substitutions) required to change one string into the other.
     """
-    # If either string is empty, the distance is the length of the other.
-    if source == '':
-        return len(target)
-    if target == '':
-        return len(source)
+    m, n = len(source), len(target)
 
-    # If the first characters match, no edit is required for that character.
-    if source[0] == target[0]:
-        return levenshtein(source[1:], target[1:])
+    # If either string is empty, distance is the length of the other
+    if m == 0:
+        return n
+    if n == 0:
+        return m
 
-    # If the first characters differ, consider the three possible edits:
-    # 1. Delete the first character of ``source``.
-    # 2. Insert the first character of ``target`` into ``source``.
-    # 3. Replace the first character of ``source`` with the first character of ``target``.
-    # The cost of each edit is 1 plus the distance of the remaining substrings.
-    return 1 + min(
-        levenshtein(source[1:], target),      # deletion
-        levenshtein(source, target[1:]),      # insertion
-        levenshtein(source[1:], target[1:])   # substitution
-    )
-```
+    # Initialize DP table
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        dp[i][0] = i
+    for j in range(n + 1):
+        dp[0][j] = j
+
+    # Compute distances
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            cost = 0 if source[i - 1] == target[j - 1] else 1
+            dp[i][j] = min(
+                dp[i - 1][j] + 1,      # deletion
+                dp[i][j - 1] + 1,      # insertion
+                dp[i - 1][j - 1] + cost  # substitution
+            )
+
+    return dp[m][n]
+
+
+"""
+Levenshtein Distance
+
+
+Calculates the Levenshtein distance between two strings.  The Levenshtein distance is defined as the minimum amount of single-character edits (either removing a character, adding a character, or changing a character) necessary to transform a source string into a target string.
+
+Input:
+    source: The string you begin with.
+    target: The string to transform into.
+
+Output:
+    The Levenshtein distance between the source and target.
+
+Example:
+    electron can be transformed into neutron by removing the e, turning the l into n, and turning the c into u.
+   
+... [49 more chars]
 ```
 
 **Gate decision** — patch applied to workspace

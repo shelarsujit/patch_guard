@@ -144,8 +144,10 @@ class Cassette:
                     record = json.loads(path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     continue
+                if record.get("model") != model:
+                    continue  # a different worker's decisions are not this one's
                 recorded = record.get("messages") or []
-                nkey = normalized_key(record.get("model", model), recorded, temperature)
+                nkey = normalized_key(model, recorded, temperature)
                 self._normalized.setdefault(nkey, record["response"])
 
         response = self._normalized.get(normalized_key(model, messages, temperature))
@@ -154,7 +156,7 @@ class Cassette:
             self.normalized_hits += 1
         return response
 
-    def get_sequential(self) -> dict | None:
+    def get_sequential(self, model: str | None = None) -> dict | None:
         """Last-resort replay: the next recorded decision, in recorded order.
 
         Content hashing cannot survive the baseline. Its prompts embed live tool
@@ -180,9 +182,17 @@ class Cassette:
             records = []
             for path in sorted(self.dir.glob("*.json")):
                 try:
-                    records.append(json.loads(path.read_text(encoding="utf-8")))
+                    record = json.loads(path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     continue
+                # Scoping to the model is not a detail. Without it this fallback
+                # hands one model's recorded run to a different model and the
+                # run "succeeds" while measuring the wrong thing: a gpt-oss-120b
+                # sweep replayed 20b decisions and produced numbers identical to
+                # the 20b run, down to which cases cheated.
+                if model is not None and record.get("model") != model:
+                    continue
+                records.append(record)
             records.sort(key=lambda r: len(r.get("messages") or []))
             self._sequence = [r["response"] for r in records]
 

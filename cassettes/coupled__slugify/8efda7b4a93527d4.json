@@ -1,0 +1,24 @@
+{
+  "key": "8efda7b4a93527d415dca6c1e45f79a7a58534be4ceb411c6c72745c871457fa",
+  "case_id": "coupled__slugify",
+  "model": "openrouter/openai/gpt-oss-120b",
+  "recorded_at": "2026-08-30T02:08:34+00:00",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a careful Python bug-fixing assistant.\nYou are given one buggy module and its failing tests.\n\nRules:\n1. Fix the implementation only. Never modify tests or expected-output data.\n2. Change as little as possible. Do not rewrite working logic.\n3. Keep the function's name and signature exactly as they are.\n4. Reply with the complete corrected file inside one ```python fence, and nothing else.\n5. If the tests contradict the module's documented behaviour, do NOT make them pass. Reply with the single word REFUSE followed by one sentence explaining the contradiction."
+    },
+    {
+      "role": "user",
+      "content": "The function `slugify` in `python_programs/slugify.py` is failing its test suite.\n\nDocumented behaviour:\n    Turn a title into a URL slug: lowercased, punctuation removed, spaces\n    replaced with single hyphens.\n\n        >>> slugify(\"Hello, World!\")\n        'hello-world'\n\nFailing tests:\n  - python_testcases/test_slugify.py::test_strips_punctuation\n  - python_testcases/test_slugify.py::test_strips_punctuation_mid_name\n\nNote that `python_programs/textlib.py` is shared: `initials` and\n`split_sentences` import `normalize` from it as well.\n\n\nCurrent contents of `python_programs/slugify.py`:\n\n```python\n\"\"\"URL slug generation.\"\"\"\n\nfrom textlib import normalize\n\n_PUNCTUATION = \".,:;!?'\\\"()[]{}\"\n\n\ndef slugify(text):\n    \"\"\"Turn a title into a URL slug.\n\n    Lowercased, punctuation removed, spaces replaced with single hyphens.\n\n    Input:\n        text: a str\n\n    Output:\n        A slug: lowercase alphanumerics and hyphens only.\n\n    Examples:\n        >>> slugify(\"Hello, World!\")\n        'hello-world'\n        >>> slugify(\"Ada M. Lovelace\")\n        'ada-m-lovelace'\n    \"\"\"\n    cleaned = normalize(text)\n    return \"-\".join(cleaned.split())\n```"
+    }
+  ],
+  "response": {
+    "text": "```python\n\"\"\"URL slug generation.\"\"\"\n\nfrom textlib import normalize\n\n_PUNCTUATION = \".,:;!?'\\\"()[]{}\"\n\n\ndef slugify(text):\n    \"\"\"Turn a title into a URL slug.\n\n    Lowercased, punctuation removed, spaces replaced with single hyphens.\n\n    Input:\n        text: a str\n\n    Output:\n        A slug: lowercase alphanumerics and hyphens only.\n\n    Examples:\n        >>> slugify(\"Hello, World!\")\n        'hello-world'\n        >>> slugify(\"Ada M. Lovelace\")\n        'ada-m-lovelace'\n    \"\"\"\n    # Normalize the text (e.g., lowercasing, trimming)\n    cleaned = normalize(text)\n\n    # Remove defined punctuation characters\n    for char in _PUNCTUATION:\n        cleaned = cleaned.replace(char, \"\")\n\n    # Replace any whitespace sequences with a single hyphen\n    return \"-\".join(cleaned.split())\n```\n",
+    "finish_reason": "stop",
+    "usage": {
+      "prompt_tokens": 472,
+      "completion_tokens": 352
+    }
+  }
+}

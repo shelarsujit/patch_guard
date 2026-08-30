@@ -96,3 +96,31 @@ def test_credentials_are_redacted_before_writing(tmp_path):
     assert "sk-abcdefghijklmnopqrstuvwxyz123456" not in blob
     assert "gsk_abcdefghijklmnopqrstuvwxyz123456" not in blob
     assert "<redacted>" in blob
+
+
+def test_a_cassette_never_serves_one_model_the_other_model_s_run(tmp_path):
+    """Cross-model contamination is silent and total.
+
+    The sequential fallback replays "the next recorded decision, in recorded
+    order", which is what makes a shell-driving agent replayable at all. It also
+    means that without a model check it will happily hand a gpt-oss-120b sweep
+    the decisions gpt-oss-20b made -- and the sweep succeeds, writes results, and
+    reports numbers.
+
+    That happened: a 120b capability run produced numbers identical to the 20b
+    run, case for case, including which impossible variants were cheated on.
+    Only one cassette in the whole repository had actually been recorded under
+    the 120b model. The identical numbers were the only symptom.
+    """
+    from patch_guard.cassettes import Cassette
+
+    c = Cassette("xmodel", mode="record", root=tmp_path)
+    msgs = [{"role": "user", "content": "fix it"}]
+    c.put(key_for("model-a", msgs, 0.0), "model-a", msgs, {"text": "answer from A"})
+
+    replay = Cassette("xmodel", mode="replay", root=tmp_path)
+    assert replay.get_sequential("model-a") is not None, "same model still replays"
+
+    other = Cassette("xmodel", mode="replay", root=tmp_path)
+    assert other.get_sequential("model-b") is None, \
+        "a different model must miss rather than inherit another model's run"
