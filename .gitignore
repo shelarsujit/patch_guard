@@ -36,3 +36,11 @@ results/test*.jsonl
 trajectories/smoke*/
 results/_smoke*
 video/build/
+
+# The video generator itself. The rendered mp4 ships; the pipeline that built it
+# is not part of Patch-Guard and would read as scaffolding in a review. Kept on
+# disk so the video stays rebuildable, and in history at c4eb498.
+video/build_video.py
+video/sections.py
+video/__init__.py
+docs/VIDEO_SCRIPT.md

@@ -137,21 +137,28 @@ the baseline, so the measured gap is a floor rather than a best case.
 ## 5 — At this model tier, most apparent agent failure is harness artifact
 
 **What I tried and why.** The intent was simply to run the recording sweep. What
-actually happened is the finding: nine distinct infrastructure faults surfaced,
+actually happened is the finding: twelve distinct infrastructure faults surfaced,
 each of which would have produced a *number* rather than an error, and each of
-which a reasonable person would have read as the agent behaving badly.
+which a reasonable person would have read as an agent behaving badly.
 
-| # | Fault | Would have been scored as |
-|---|---|---|
-| 1 | `correct_python_programs/` copied into the workspace | **100% net-resolved, measuring nothing** |
-| 2 | Sibling case workspaces reachable via `..` | agent "found" fixes by reading other cases |
-| 3 | `FormatError` raised inside upstream's tenacity loop — 10 identical retries, then episode death | agent failed to produce a valid edit |
-| 4 | `FormatError(...)` given a list where varargs were expected | crash, once fault 3 was fixed |
-| 5 | Groq's undocumented 200k tokens/day ceiling | `target-failed` |
-| 6 | OpenRouter routing to a backend that drops the harmony final channel | agent failed to act |
-| 7 | Model wedged in the reasoning channel; identical retry at temperature 0 | repeated format errors, episode death |
-| 8 | Orphaned `pytest` surviving its shell, holding a pipe open | sweep hangs, indistinguishable from working |
-| 9 | Same orphan locking the workspace directory | crash discarding four completed cases |
+The last column is the one that matters, and it is the one I got wrong first.
+"Favours" means the fault, left unfixed, would have made Patch-Guard look better
+than it is; "against" means it would have made it look worse.
+
+| # | Fault | Would have been scored as | Direction |
+|---|---|---|---|
+| 1 | `correct_python_programs/` copied into the workspace | **100% net-resolved, measuring nothing** | unclear |
+| 2 | Sibling case workspaces reachable via `..` | agent "found" fixes by reading other cases | unclear |
+| 3 | `FormatError` raised inside upstream's tenacity loop — 10 identical retries, then episode death | agent failed to produce a valid edit | favours |
+| 4 | `FormatError(...)` given a list where varargs were expected | crash, once fault 3 was fixed | favours |
+| 5 | Groq's undocumented 200k tokens/day ceiling | `target-failed` | unclear |
+| 6 | OpenRouter routing to a backend that drops the harmony final channel | agent failed to act | favours |
+| 7 | Model wedged in the reasoning channel; identical retry at temperature 0 | repeated format errors, episode death | favours |
+| 8 | Orphaned `pytest` surviving its shell, holding a pipe open | sweep hangs, indistinguishable from working | favours |
+| 9 | Same orphan locking the workspace directory | crash discarding four completed cases | unclear |
+| 10 | pytest aborting the whole run on one collection error | **62 regressions** across nine unrelated programs | favours |
+| 11 | Sequential cassette fallback ignoring the model field | a 120b sweep replaying 20b decisions — **a fabricated capability axis** | favours |
+| 12 | Regression suite run against a tree with no diff | **5.90 regressions per patch for the supervisor, 0.00 for the baseline** | against |
 
 **Evidence.** Each is measured, not inferred. Fault 6 was isolated by sending one
 request to every backend serving the model: Darkbloom returned `finish=stop` with
@@ -159,11 +166,15 @@ no tool call; CoreWeave, DeepInfra, Parasail and Bedrock returned `finish=tool_c
 Fault 7 by holding a wedged conversation fixed and varying one setting at a time —
 `tool_choice=required`, excluding reasoning, and raising temperature all failed;
 only `reasoning effort=low` recovered. Fault 8 by timing the exact shape that hung:
-5.4s against a 5s limit, where before it never returned. Fault 1 is now pinned by
-`test_gold_implementations_are_not_visible_to_the_agent`, fault 8 by
-`test_a_runaway_grandchild_cannot_hang_the_sweep`.
+5.4s against a 5s limit, where before it never returned. Fault 11 by observing that
+the 120b numbers matched the 20b numbers case for case, down to which cases cheated,
+and that only 1 of 233 recordings was actually a 120b response. Fault 1 is now
+pinned by `test_gold_implementations_are_not_visible_to_the_agent`, fault 8 by
+`test_a_runaway_grandchild_cannot_hang_the_sweep`, fault 11 by
+`test_a_cassette_never_serves_one_model_the_other_model_s_run`, and fault 12 by the
+no-change invariant in `eval/harness.py`.
 
-**Decision / Learning.** Two things follow, and the second is uncomfortable.
+**Decision / Learning.** Three things follow, and only the first is comfortable.
 
 First, the published failure-mode literature is measured on frontier models
 through mature harnesses. At the 20B open-weight tier the harness itself is a
@@ -171,15 +182,31 @@ dominant source of apparent incompetence, and a paper reporting "the cheap model
 scored X" without controlling for these is not obviously measuring the model.
 That is a methodological claim this project can support with receipts.
 
-Second — and this is the disclosure that matters — **faults 3, 6, 7 and 8 hit the
-baseline and not the supervisor.** The baseline drives tool calls through a real
-shell; the supervisor makes a single text completion and never runs a command. So
-the artifact-prone surface is almost entirely on the side this project wants to
-look worse. Every one of those bugs, left unfixed, would have widened the measured
-gap in Patch-Guard's favour. They were found and fixed *before* the numbers were
-recorded, which is the only ordering that makes the comparison worth anything, and
-it is the reason the fixes are itemised here rather than quietly folded into a
-commit labelled "misc fixes".
+Second, the asymmetry is real but smaller than I first wrote. **Faults 3, 6, 7 and
+8 hit the baseline and not the supervisor**, because the baseline drives tool calls
+through a real shell while the supervisor makes a single text completion and never
+runs a command — so the artifact-prone surface sits mostly on the side this project
+wants to look worse. Faults 10 and 11 point the same way. That is seven of twelve
+flattering the thesis, four not clearly attributable, and one — fault 12 — pointing
+squarely the other way. An earlier draft of this entry, and the submission video,
+claimed *every* fault favoured the project. That was wrong, and it was wrong in the
+direction that made the story cleaner.
+
+Third, and this is the part that limits the claim: **the discovery process is not
+a fair sample.** A fault that makes my own number look bad announces itself — fault
+12 inverted the headline and was found within hours. A fault that makes it look
+good is found only by deliberately going back over a result I was already happy
+with. So a tally skewed toward "favours" is exactly what motivated stopping
+predicts, with no asymmetry in the infrastructure required to produce it. The 7:1
+split is consistent with the infrastructure being biased, and equally consistent
+with my attention being biased, and this project cannot separate the two.
+
+Separating them needs a design this project does not have: seed known faults into
+an eval harness, half favouring the system under test and half against, hand it to
+observers blind to which, and measure time-to-detection by direction. Until that
+exists, the honest form of the claim is the first paragraph — harness artifacts
+dominate apparent agent failure at this tier — and not any statement about which
+way they lean.
 
 ---
 
