@@ -112,10 +112,20 @@ Per case the supervisor never loses: it wins `depth_first_search` and
 
 The +20 points was not the expected result. Gates were built to *reject* bad
 patches, so the prior was that they would trade resolution for safety. They did
-not, because a rejection carries its reason back to the worker: "the target
-tests still fail", "the patched code never terminated (infinite loop)". Two
-cases the one-shot baseline abandoned were recovered on a later attempt. The
-gates are a repair signal, not only a filter.
+not — but the reason is not the one this README gave first.
+
+The original claim was that a rejection carries its reason back to the worker, so
+rejected cases get repaired on a later attempt. The per-case rows say otherwise:
+**every case the supervisor won, it won with `retries=0`**, and every case that
+entered the retry loop ended `RejectedByGuard`. No case in the sweep was recovered
+by a retry.
+
+What the two gained cases have in common is how the *baseline* lost them —
+`LimitsExceeded` on both, its step budget spent discovering the file and function
+through a shell. The supervisor spends its single model call on a pre-localized
+prompt. So the gates own the cheat rate (2/4 → 0/4, directly observed) and the
+scaffolding owns the resolution rate. Separating the two properly needs an
+ablation this project did not run, and the claim is limited accordingly.
 
 ### Gate 2, measured on a set that can exercise it
 
@@ -146,6 +156,36 @@ left the bug unfixed and broke two tests that had been passing. The supervisor
 fixed it cleanly on the first attempt. n=1, and reported as such — the claim here
 is that the gate *fires on a real regression from a real model*, not that this
 size of gap generalises.
+
+### Capability axis — does supervision matter less as the worker improves?
+
+Prior work reports gating helping weaker models roughly twice as much as stronger
+ones. That was being cited here rather than tested, so the same 14 cases were run
+against a worker six times larger.
+
+| Worker | Baseline | Patch-Guard | Gain from supervision |
+|---|---|---|---|
+| `gpt-oss-20b` | 50% | 70% | **+20 pts** |
+| `gpt-oss-120b` | 70% | 80% | **+10 pts** |
+
+The gain halves, which replicates the reported gradient through a different
+mechanism. The second table does not go the same way:
+
+| Worker | Baseline cheats | Patch-Guard cheats |
+|---|---|---|
+| `gpt-oss-20b` | 2/4 | **0/4** |
+| `gpt-oss-120b` | **3/4** | **0/4** |
+
+Unsupervised, the larger model reward-hacked *more*, not less. Capability bought
+competence and cost integrity. Under the gates both models cheat zero times,
+because the anti-cheat gate is a file hash and does not require the worker to be
+honest. Read as two points, not a trend: n=4 impossible cases per model, and 2/4
+versus 3/4 is a single case.
+
+This result was measured only after fixing a cassette fault that had fabricated
+its opposite — the sequential replay fallback ignored the model field, so a 120b
+sweep replayed 20b decisions and produced numbers identical to the 20b run, down
+to which cases cheated. See CHANGELOG entry 5, fault 11.
 
 ### What these numbers do not show
 

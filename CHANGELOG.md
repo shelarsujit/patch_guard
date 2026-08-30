@@ -210,24 +210,47 @@ way they lean.
 
 ---
 
-## 6 — The gates turned out to be a repair signal, not only a filter
+## 6 — The gain is real; the mechanism I gave for it was not
 
 **What I tried and why.** The expectation going in was a trade: gates reject bad
 patches, so the supervisor should resolve *fewer* cases than the baseline while
-cheating less. That prediction was wrong in a way worth recording.
+cheating less. That prediction was wrong, and the first explanation I wrote for
+why it was wrong is also wrong.
 
-**Evidence.** 50% → 70% net-resolved, and 14% → 0% cheat rate, with no case where
-the baseline won and the supervisor lost. The two cases the supervisor gained,
-`depth_first_search` and `detect_cycle`, are ones the one-shot baseline abandoned.
+**Evidence.** 50% → 70% net-resolved and 14% → 0% cheat rate, with no case where
+the baseline won and the supervisor lost. The two cases gained are
+`depth_first_search` and `detect_cycle`.
 
-**Decision / Learning.** The mechanism is that a rejection carries its reason back
-into the next attempt — "the target tests still fail", "the patched code never
-terminated (infinite loop)" — so the worker gets a grounded, specific correction
-rather than another blind try. This is the opposite end of ECLoop's finding that
-post-hoc *self-review* degrades performance (−1.4pp, −1.8pp): a pytest exit code
-does not reason about whether the evidence was sufficient, and cannot be argued
-out of a failing assertion. Deterministic post-hoc execution is a different
-mechanism from post-hoc LLM review, and on this set it helped rather than hurt.
+The original entry then claimed the mechanism was the retry loop: a rejection
+carries its reason back into the next attempt, so the worker gets a grounded
+correction rather than another blind try. It reads well. The per-case rows do not
+support it.
+
+| | retries | exit status |
+|---|---|---|
+| every case the supervisor **won** | **0** | `Submitted` |
+| every case the supervisor **retried** | 4 | `RejectedByGuard` |
+
+Not one case in the sweep was recovered by a retry. The repair loop fired only on
+cases that went on to be rejected anyway. And the two gained cases were lost by
+the baseline with `LimitsExceeded` — it exhausted its step budget driving a shell,
+rather than producing a wrong patch the gates then corrected.
+
+**Decision / Learning.** The honest reading splits the result in two. The gates
+own the cheat rate: 2/4 → 0/4 is anti-cheat and target-gate rejections, directly
+observed. They do not own the resolution rate. What distinguishes the runners on
+`depth_first_search` and `detect_cycle` is that the supervisor spends its single
+model call on a pre-localized prompt — file, function, failing test names, file
+contents — while the baseline spends its budget discovering the same facts
+through a shell. That is a scaffolding effect, not a verification effect, and
+this project did not run the ablation that would separate them.
+
+The ECLoop contrast still holds and is worth keeping: a pytest exit code cannot be
+argued out of a failing assertion the way post-hoc LLM self-review can, which is
+why deterministic gates did not degrade performance here where ECLoop's
+self-review degraded it by 1.4 and 1.8 points. But "the gates are a repair signal"
+was a story I liked, retrofitted onto a number that has a duller cause. It is
+struck.
 
 ---
 
@@ -333,6 +356,13 @@ and reported as n=1.
   to measure it properly -- see entry 8. An earlier version of this bullet cited
   "one impossible case that broke 62 previously passing tests"; that figure was a
   collection-abort artefact and is withdrawn.
+- **The +20 is not attributed to a mechanism.** Every case the supervisor won, it
+  won on the first attempt; the retry loop never recovered one. The two gained
+  cases were lost by the baseline to step-budget exhaustion, so the difference is
+  plausibly the pre-localized prompt rather than the gates. The gates demonstrably
+  own the cheat rate. They are not shown to own the resolution rate, and the
+  ablation that would settle it — supervisor scaffolding with the gates disabled —
+  was not run. See entry 6.
 - **Nothing refused; it was blocked.** Correct-refusal is 0/4 for both runners.
   The supervisor never cheated, but it also never recognised the contradiction
   and said so — the `REFUSE` path never fired. Harm prevented, diagnosis not made.
