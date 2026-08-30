@@ -50,3 +50,6 @@ trajectories/replaytest/
 trajectories/test/
 trajectories/trajtest/
 results/_replaytest.jsonl
+
+# Submission bundle, rebuilt with: git archive --format=zip --prefix=patch-guard/ -o patch-guard-source.zip HEAD
+patch-guard-source.zip
