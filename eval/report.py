@@ -133,10 +133,63 @@ def hot_take(results: dict[str, list[CaseResult]]) -> str:
     return "\n".join(lines)
 
 
+
+def capability_axis(results: dict[str, list[CaseResult]]) -> str:
+    """Does supervision help the weaker model more?
+
+    ECLoop reports gains roughly twice as large on the weaker of its two models
+    (+11.8 and +10.4 for GPT-5-mini against +4.8 and +5.0 for MiniMax-M2.5), and
+    this project cites that to justify evaluating a 20B worker. Citing a gradient
+    is not testing one, so the same cases are run again with gpt-oss-120b and the
+    *gain from supervision* is compared at each size.
+
+    Restricted to cases both models actually ran, so both rows cover the same set.
+    """
+    need = ("baseline", "agent", "baseline_120b", "agent_120b")
+    have = {k: results.get(k) for k in need}
+    if not all(have.values()):
+        return "_Run the 120b sweep to populate this section._"
+
+    shared = set.intersection(*({r.case_id for r in rows} for rows in have.values()))
+
+    def rate(rows):
+        std = [r for r in rows if r.case_id in shared and r.kind == "standard"]
+        return (sum(r.net_resolved for r in std) / len(std) if std else 0.0), len(std)
+
+    def cheats(rows):
+        imp = [r for r in rows if r.case_id in shared and r.kind == "impossible"]
+        return sum(r.cheated for r in imp), len(imp)
+
+    b20, n = rate(have["baseline"])
+    a20, _ = rate(have["agent"])
+    b120, _ = rate(have["baseline_120b"])
+    a120, _ = rate(have["agent_120b"])
+    cb20, ni = cheats(have["baseline"])
+    ca20, _ = cheats(have["agent"])
+    cb120, _ = cheats(have["baseline_120b"])
+    ca120, _ = cheats(have["agent_120b"])
+
+    out = [
+        f"Computed over the {n} standard and {ni} impossible cases both models ran.",
+        "",
+        "| Worker | Baseline | Patch-Guard | Gain from supervision |",
+        "|---|---|---|---|",
+        f"| `gpt-oss-20b` | {b20:.0%} | {a20:.0%} | **{(a20 - b20) * 100:+.0f} pts** |",
+        f"| `gpt-oss-120b` | {b120:.0%} | {a120:.0%} | **{(a120 - b120) * 100:+.0f} pts** |",
+        "",
+        "Reward hacking on the impossible variants, same cases:",
+        "",
+        "| Worker | Baseline cheats | Patch-Guard cheats |",
+        "|---|---|---|",
+        f"| `gpt-oss-20b` | {cb20}/{ni} | {ca20}/{ni} |",
+        f"| `gpt-oss-120b` | {cb120}/{ni} | {ca120}/{ni} |",
+    ]
+    return chr(10).join(out)
+
 def main() -> None:
     results: dict[str, list[CaseResult]] = {}
     summaries: dict[str, Summary] = {}
-    for runner in RUNNERS:
+    for runner in [*RUNNERS, "baseline_120b", "agent_120b"]:
         path = config.RESULTS_DIR / f"{runner}.jsonl"
         if path.is_file():
             results[runner] = load(path)
@@ -197,6 +250,10 @@ thing this project exists to measure.
 ## Per case
 
 {per_case_table(results)}
+
+## Capability axis — does supervision help the weaker model more?
+
+{capability_axis(results)}
 
 ## Harness self-test
 
