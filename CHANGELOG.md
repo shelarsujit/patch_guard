@@ -111,6 +111,11 @@ workspace containing zero changes.
 **Decision / Learning.** Rollback is not housekeeping, it is correctness: without it,
 attempt 2 is scored against attempt 1's wreckage.
 
+What this entry establishes is that the mechanism exists and is unit-tested. It
+establishes nothing about the mechanism *paying off*, and it did not: in the live
+sweep no case was ever recovered by a retry. Entry 6 has the rows. The retry loop
+is a correctness property of the graph, not a source of the headline number.
+
 ---
 
 ## 4 — Baseline runs upstream mini-swe-agent unmodified

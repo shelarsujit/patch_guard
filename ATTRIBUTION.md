@@ -77,3 +77,20 @@ and reporting the conjunction as the primary metric:
 Claude Code was used as a development assistant while building this repository. It
 was **not** used as the evaluated worker model — that is `gpt-oss-20b`, for every
 measured run in `results/`.
+
+## The submission video
+
+`video/patch-guard.mp4` is generated, not recorded. The generator is not part of
+Patch-Guard and is not shipped in this repository (it is in git history at
+`c4eb498`), but the third-party software it used is pre-existing work and is
+named here for the same reason everything else on this page is:
+
+| Tool | Role | Licence |
+|---|---|---|
+| [Pillow](https://python-pillow.org/) | draws the slides | MIT-CMU |
+| [edge-tts](https://github.com/rany2/edge-tts) | narration, via Microsoft's neural voices | GPL-3.0 (build-time tool only; not linked or redistributed) |
+| [FFmpeg](https://ffmpeg.org/) | muxes stills to narration and concatenates | LGPL-2.1+ / GPL-2+ |
+
+The slide text and narration are new work. Every figure on screen is copied from
+`results/report.md`, which is generated from `results/*.jsonl`.
+

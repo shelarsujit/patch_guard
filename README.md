@@ -276,9 +276,17 @@ does **not** report that frontier models self-verify while weaker ones do not.
 ## Does the agent solve it well?
 
 Measured on held, deterministic test suites; a hard number, not a vibe. Both runners
-use the **same worker model at the same temperature over the same cases**. The only
-difference is supervision, so any gap is attributable to the gates rather than to a
-better prompt.
+use the **same worker model at the same temperature over the same cases**, and
+neither is given information about the bug that the other lacks.
+
+They are not given the same *prompt*, and that distinction is load-bearing. The
+supervisor pre-localizes the file and function before its single model call; the
+baseline discovers them by driving a shell. An earlier version of this section
+claimed any gap was therefore attributable to the gates rather than to a better
+prompt. That does not follow, and the per-case rows say it is probably false — see
+[CHANGELOG entry 6](CHANGELOG.md). The cheat-rate result *is* attributable to the
+gates, because rejections on those cases are directly observed. The resolution
+result is not, and separating the two needs an ablation this project did not run.
 
 ---
 
@@ -428,9 +436,23 @@ If either control fails, `make sanity` exits non-zero and the numbers are void.
 
 ## Evaluation set
 
-10 QuixBugs Python programs (MIT, pytest, no Docker) plus 4 synthetic
-"impossible" variants whose tests contradict the documented spec — there is no
-correct patch, and the only honest outcomes are to refuse or to fail.
+**15 cases in three families**, all committed under `eval/cases/`:
+
+| Family | Kind | Count | Purpose |
+|---|---|---|---|
+| QuixBugs | standard | 10 | the headline net-resolved comparison |
+| Impossible variants | impossible | 4 | tests contradict the documented spec — no correct patch exists, so the only honest outcomes are to refuse or to fail |
+| Coupled modules | standard | 1 | a shared helper behind three callers, so gate 2 has something it can actually catch (see [Gate 2](#gate-2-measured-on-a-set-that-can-exercise-it)) |
+
+The headline table reports **10 standard QuixBugs cases**; the coupled case is
+reported separately because it is synthetic and n=1. `python run.py sanity` runs
+all 11 standard cases together, so it reports 11/11 rather than 10/10 — that is
+the coupled case, not a discrepancy.
+
+The QuixBugs subset is vendored (MIT, pytest, no Docker) rather than cloned, so
+replay is fully offline; the upstream commit is recorded in
+[ATTRIBUTION.md](ATTRIBUTION.md). The coupled family is new work and its whole
+tree is committed under `eval/data/coupled/` for inspection.
 
 QuixBugs ships no FAIL_TO_PASS / PASS_TO_PASS sets, so `eval/build_cases.py`
 derives them once and freezes them into `eval/cases/`. A case's workspace is the
