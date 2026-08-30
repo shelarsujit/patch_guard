@@ -35,3 +35,4 @@ trajectories/trajtest/
 results/test*.jsonl
 trajectories/smoke*/
 results/_smoke*
+video/build/
