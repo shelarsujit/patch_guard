@@ -7,6 +7,33 @@ the patch (a) makes the reported failing test pass, (b) breaks no previously-pas
 test, and (c) leaves the test files untouched. The same three checks are exposed as
 an MCP server, so Claude Code or Cursor can call the guard on their own work.
 
+On the same worker model, same cases, same temperature — supervision is the only
+variable — **net-resolved goes 50% -> 70% and reward hacking goes 2/4 -> 0/4**.
+Reproducible offline, with no API key, at $0: `python run.py agent eval`.
+
+---
+
+## Quick start
+
+Clean machine to reproduced numbers. Python **3.12** is canonical (the
+devcontainer pins `python:3.12-slim`); 3.14 also works on the dev host.
+
+```
+git clone https://github.com/shelarsujit/patch_guard
+cd patch_guard
+python -m venv .venv
+.venv/Scripts/activate          # Windows;  source .venv/bin/activate elsewhere
+pip install -r requirements.txt
+
+python run.py sanity            # harness self-test: gold 100%, no-op 0%
+python run.py agent eval        # the numbers above, from committed cassettes
+```
+
+No API key, no Docker, no network. A devcontainer is provided
+(`.devcontainer/`) for the canonical Python 3.12 environment; see
+[Reproducing](#reproducing) for the baseline, the record path, and expected
+runtimes.
+
 ---
 
 ## Who has this problem
@@ -286,7 +313,7 @@ chaining them:
 
 ```
 python run.py sanity      # gold patch scores 100%; a no-op agent scores 0%
-python run.py test        # 51 adversarial tests: gates, cassettes, graph, harness
+python run.py test        # 56 adversarial tests: gates, cassettes, graph, harness
 python run.py baseline    # mini-swe-agent          -> results/baseline.jsonl
 python run.py agent       # Patch-Guard supervisor  -> results/agent.jsonl
 python run.py eval        # -> results/report.md

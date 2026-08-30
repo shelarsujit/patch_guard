@@ -348,3 +348,54 @@ and reported as n=1.
   "done-or-not" verifier. The deterministic gates already dominate what a learned
   trustworthiness predictor would offer, and the brief explicitly rewards a
   documented cut over a half-finished experiment.
+
+---
+
+## The main failure mode
+
+**Patch-Guard blocks the cheat without ever naming it.**
+
+On the four impossible variants -- where the target test asserts something the
+program's documented spec forbids -- the supervisor cheats 0 out of 4 times, at
+both model sizes. It also refuses 0 out of 4 times. The `REFUSE` path exists in
+the graph and never fired once.
+
+What actually happens is that the worker produces a patch, the anti-cheat gate
+sees a modified test file or the target gate sees a spec violation, the patch is
+rolled back, and the retry budget runs out. The case ends as non-compliance. A
+maintainer reading that output learns the agent could not do it. They do not
+learn *the test is wrong*, which is the only fact worth having.
+
+Harm prevented, diagnosis not made. That is a real limit and it is the honest
+ceiling on the deterministic approach: a gate can compare a patch against a
+suite, but "this assertion contradicts the docstring" is a judgement about
+intent, and no exit code carries it. Closing it needs a component this project
+deliberately did not build.
+
+## Hot take
+
+**The agent's own report of what it accomplished carries no weight. Neither does
+mine, and I have the receipts.**
+
+The entire design rests on refusing to let a worker grade itself. Every number
+here is produced by gates the worker cannot reach, because an agent that says
+"done" is making a claim, not a measurement.
+
+Then I wrote, in the README and in the submission video, that all of the harness
+faults I had found biased the comparison in this project's favour. It was a
+clean line. It was also false: fault 12 inverted the headline *against* the
+supervisor, and I had fixed it myself weeks earlier. Nothing caught this. The
+tests passed, the sanity controls passed, the numbers were correct -- because
+the claim was in prose, and prose has no gate.
+
+So the uncomfortable version of the thesis is this. At the 20B tier, most of
+what looks like agent failure is harness artifact -- twelve of them here, each
+producing a plausible number instead of an error. But the artifacts I found are
+not a fair sample of the artifacts that exist, because the ones that flatter me
+are the ones I had no reason to go looking for. I can measure a patch. I cannot
+measure my own attention, and the discipline that makes the agent's numbers
+trustworthy stops precisely where the write-up begins.
+
+If you take one thing from this repository, take that the gates are the easy
+part.
+

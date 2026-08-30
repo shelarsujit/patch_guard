@@ -44,3 +44,9 @@ video/build_video.py
 video/sections.py
 video/__init__.py
 docs/VIDEO_SCRIPT.md
+
+# Scratch trajectories written by the test suite, not evidence.
+trajectories/replaytest/
+trajectories/test/
+trajectories/trajtest/
+results/_replaytest.jsonl
