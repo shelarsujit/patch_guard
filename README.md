@@ -319,6 +319,48 @@ reach the regression gate at all.
 is rolled back and the guard reports `RejectedByGuard`. Refusing to submit a bad
 patch is the product working.
 
+### Where the agent is, and where it deliberately is not
+
+There are two agents in this picture and the supervisor is not one of them.
+
+The **baseline is a real agent**: upstream mini-swe-agent, unmodified, running
+multi-step against a live bash shell where the model chooses its own commands and
+loops until it submits or exhausts its budget. That is the system under test, and
+its failure modes are what everything here is built to catch. The **MCP server**
+serves agents too — Claude Code or Cursor calling `run_target_test`,
+`run_regression_suite` and `assert_tests_unmodified` on work they just produced.
+
+The **supervisor is a workflow, not an agent**, and that is the central design
+decision rather than a shortcut. It makes exactly one model call per attempt — the
+`patch` node — and every routing decision is a plain Python function reading a
+pytest exit code. The model chooses no tools and decides no next step.
+
+The reason is that the obvious agentic alternative is measurably worse. ECLoop
+reports that post-hoc LLM **self-review degrades** end-to-end performance (−1.4pp,
+−1.8pp): a reviewing model can be argued out of a correct objection, and it is
+argued by the same distribution that produced the patch. A pytest exit code cannot
+be. So the component that decides whether work is acceptable is the one component
+with no model in it, and the consequences are concrete:
+
+- **The guard cannot be socially engineered by the thing it is guarding.** Gate 3
+  is a SHA-256 comparison. There is no prompt that talks it out of a changed file.
+- **Every verdict replays offline at $0.** A judge reproduces the decisions without
+  a key, because the decisions were never a model's to make.
+- **The gate logic is shared, not duplicated.** `patch_guard/gates.py` is called by
+  the graph nodes and by the MCP tools, so what Claude Code is told is what the
+  supervisor enforced.
+
+Agency is kept where it earns its place. The worker may **refuse** — it is told
+that if the tests contradict the documented spec it should say so rather than
+comply — and refusal is detected identically for both runners
+(`patch_guard/refusal.py`) so the comparison is like-for-like. Rejections carry
+their reason and evidence into the next prompt, and the workspace is rolled back
+first so attempt 2 is not scored against attempt 1's wreckage.
+
+And the honest half: that retry loop **never recovered a case** in the live sweep.
+It is a correctness property of the graph, verified by unit tests, not a source of
+the headline number — see [CHANGELOG entry 6](CHANGELOG.md).
+
 ## MCP server
 
 Three tools, thin wrappers over the identical `patch_guard/gates.py` functions the
