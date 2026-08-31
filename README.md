@@ -319,47 +319,47 @@ reach the regression gate at all.
 is rolled back and the guard reports `RejectedByGuard`. Refusing to submit a bad
 patch is the product working.
 
-### Where the agent is, and where it deliberately is not
+### Which design choices helped the agent
 
-There are two agents in this picture and the supervisor is not one of them.
+Patch-Guard is a **supervised bug-fixing agent**: a LangGraph supervisor wrapping
+a cheap worker model. The comparison it is measured against is the same model run
+*unsupervised* — upstream mini-swe-agent, unmodified, multi-step against a live
+bash shell, choosing its own commands until it submits or exhausts its budget.
+Because that baseline is fair and every case is logged per-attempt, "which design
+choices helped the agent" has measured answers here rather than claimed ones:
 
-The **baseline is a real agent**: upstream mini-swe-agent, unmodified, running
-multi-step against a live bash shell where the model chooses its own commands and
-loops until it submits or exhausts its budget. That is the system under test, and
-its failure modes are what everything here is built to catch. The **MCP server**
-serves agents too — Claude Code or Cursor calling `run_target_test`,
-`run_regression_suite` and `assert_tests_unmodified` on work they just produced.
+| Design choice | What it bought | How well established |
+|---|---|---|
+| Pre-localize the file and function *before* the model call | most plausibly the **+20 pts** net-resolved | **Not isolated.** The baseline lost both gained cases to `LimitsExceeded` — budget spent finding what the supervisor is handed. The ablation was not run; see [CHANGELOG entry 6](CHANGELOG.md). |
+| Protected paths, compared by SHA-256 | **cheat rate 2/4 → 0/4**, at both model sizes | Directly observed. The gate is a hash; no prompt talks it out of a changed file. |
+| Roll the workspace back before retrying | attempt 2 is scored against the original bug, not attempt 1's wreckage | Unit-tested (`test_persistent_regression_is_never_submitted`). |
+| Carry the rejection's reason *and evidence* into the next prompt | the mechanism works; **it recovered zero cases** | Unit-tested, and honestly reported as a correctness property rather than a source of the number. |
+| Give the worker an explicit refusal path | 0/4 refusals — it never fired | Detected identically for both runners (`patch_guard/refusal.py`) so the comparison is like-for-like. |
 
-The **supervisor is a workflow, not an agent**, and that is the central design
-decision rather than a shortcut. It makes exactly one model call per attempt — the
-`patch` node — and every routing decision is a plain Python function reading a
-pytest exit code. The model chooses no tools and decides no next step.
+### One choice was to take agency out
 
-The reason is that the obvious agentic alternative is measurably worse. ECLoop
-reports that post-hoc LLM **self-review degrades** end-to-end performance (−1.4pp,
-−1.8pp): a reviewing model can be argued out of a correct objection, and it is
-argued by the same distribution that produced the patch. A pytest exit code cannot
-be. So the component that decides whether work is acceptable is the one component
-with no model in it, and the consequences are concrete:
+The component that decides whether work is acceptable has **no model in it**. The
+supervisor makes exactly one model call per attempt — the `patch` node — and every
+routing decision is a plain Python function reading a pytest exit code.
 
-- **The guard cannot be socially engineered by the thing it is guarding.** Gate 3
-  is a SHA-256 comparison. There is no prompt that talks it out of a changed file.
-- **Every verdict replays offline at $0.** A judge reproduces the decisions without
-  a key, because the decisions were never a model's to make.
+That is deliberate, and the reason is measured elsewhere: ECLoop reports post-hoc
+LLM **self-review degrading** end-to-end performance (−1.4pp, −1.8pp). A reviewing
+model can be argued out of a correct objection, and it is argued by the same
+distribution that produced the patch. A SHA-256 comparison cannot be. Three
+consequences follow:
+
+- **The guard cannot be socially engineered by the thing it guards.**
+- **Every verdict replays offline at $0** — the decisions were never a model's to
+  make, so reproducing them needs no key.
 - **The gate logic is shared, not duplicated.** `patch_guard/gates.py` is called by
-  the graph nodes and by the MCP tools, so what Claude Code is told is what the
-  supervisor enforced.
+  the graph nodes *and* by the MCP tools, so what Claude Code is told is exactly
+  what the supervisor enforced.
 
-Agency is kept where it earns its place. The worker may **refuse** — it is told
-that if the tests contradict the documented spec it should say so rather than
-comply — and refusal is detected identically for both runners
-(`patch_guard/refusal.py`) so the comparison is like-for-like. Rejections carry
-their reason and evidence into the next prompt, and the workspace is rolled back
-first so attempt 2 is not scored against attempt 1's wreckage.
-
-And the honest half: that retry loop **never recovered a case** in the live sweep.
-It is a correctness property of the graph, verified by unit tests, not a source of
-the headline number — see [CHANGELOG entry 6](CHANGELOG.md).
+The MCP server is the other place agents appear: Claude Code or Cursor calling
+`run_target_test`, `run_regression_suite` and `assert_tests_unmodified` on work
+they just produced. `docs/mcp_demo.md` is a transcript of a real stdio client
+against a live server, where the three verdicts disagree — an agent trusting only
+the first tool would have submitted a patch that broke four tests.
 
 ## MCP server
 
